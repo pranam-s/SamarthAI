@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}{{ job.title }} - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">{{ job.title }}</h1>
+    <div>
+        {% if user.is_recruiter and job.company_id == user.id %}
+        <a href="/jobs/{{ job.id }}/edit" class="btn btn-outline">Edit Job</a>
+        {% elif not user.is_recruiter %}
+            {% if user_applications %}
+            <div class="badge badge-lg badge-success">You've Applied</div>
+            {% else %}
+            <button class="btn btn-primary" onclick="document.getElementById('apply-modal').showModal()">Apply Now</button>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Job Card -->
+    <div class="card bg-base-100 shadow-xl lg:col-span-2">
+        <div class="card-body">
+            <h2 class="card-title">Job Description</h2>
+            <div class="whitespace-pre-line">{{ job.description_text }}</div>
+            
+            <div class="divider"></div>
+            
+            <h3 class="text-lg font-bold">Required Skills</h3>
+            <div class="flex flex-wrap gap-2 mt-2">
+                {% for skill in job.required_skills %}
+                <div class="badge badge-lg badge-primary">{{ skill.name }}</div>
+                {% endfor %}
+            </div>
+            
+            {% if job.preferred_skills %}
+            <h3 class="text-lg font-bold mt-6">Preferred Skills</h3>
+            <div class="flex flex-wrap gap-2 mt-2">
+                {% for skill in job.preferred_skills %}
+                <div class="badge badge-lg badge-secondary">{{ skill.name }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            
+            {% if job.responsibilities %}
+            <h3 class="text-lg font-bold mt-6">Responsibilities</h3>
+            <ul class="list-disc list-inside mt-2">
+                {% for responsibility in job.responsibilities %}
+                <li>{{ responsibility }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            
+            {% if job.qualifications %}
+            <h3 class="text-lg font-bold mt-6">Qualifications</h3>
+            <ul class="list-disc list-inside mt-2">
+                {% for qualification in job.qualifications %}
+                <li>{{ qualification }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Sidebar -->
+    <div class="space-y-6">
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title">Job Details</h2>
+                <div class="overflow-x-auto">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <td class="font-medium">Posted Date</td>
+                                <td>{{ job.created_at.strftime('%Y-%m-%d') }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-medium">Last Updated</td>
+                                <td>{{ job.updated_at.strftime('%Y-%m-%d') if job.updated_at else job.created_at.strftime('%Y-%m-%d') }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-medium">Required Skills</td>
+                                <td>{{ job.required_skills|length }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-medium">Preferred Skills</td>
+                                <td>{{ job.preferred_skills|length }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                {% if not user.is_recruiter and not user_applications %}
+                <div class="card-actions justify-center mt-4">
+                    <button class="btn btn-primary w-full" onclick="document.getElementById('apply-modal').showModal()">Apply Now</button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if user.is_recruiter and job.company_id == user.id and applications %}
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title">Applications ({{ applications|length }})</h2>
+                
+                <div class="overflow-x-auto">
+                    <table class="table table-zebra">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Match</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for app in applications %}
+                            <tr class="hover">
+                                <td>{{ app.full_name }}</td>
+                                <td>
+                                    <div class="radial-progress text-xs" style="--value:{{ app.match_score }}; --size:2rem;">{{ app.match_score|round }}%</div>
+                                </td>
+                                <td>
+                                    <span class="badge {% if app.status == 'Shortlisted' %}badge-success{% elif app.status == 'Rejected' %}badge-error{% else %}badge-info{% endif %}">
+                                        {{ app.status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="/applications/{{ app.id }}" class="btn btn-xs btn-outline">View</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Apply Modal -->
+{% if not user.is_recruiter and resumes %}
+<dialog id="apply-modal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg">Apply for {{ job.title }}</h3>
+        <form method="post" action="/applications/create" class="mt-4">
+            <input type="hidden" name="job_id" value="{{ job.id }}" />
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">Select Resume</span>
+                </label>
+                <select name="resume_id" class="select select-bordered" required>
+                    <option value="" disabled selected>Choose a resume</option>
+                    {% for resume in resumes %}
+                    <option value="{{ resume.id }}">Resume #{{ resume.id }} - {{ resume.created_at.strftime('%Y-%m-%d') }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="modal-action">
+                <button type="submit" class="btn btn-primary">Submit Application</button>
+                <button type="button" class="btn" onclick="document.getElementById('apply-modal').close()">Cancel</button>
+            </div>
+        </form>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}Market Analysis - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Job Market Analysis</h1>
+    <p class="text-sm opacity-70">Last updated: {{ analysis.analysis_date|replace('T', ' ')|replace('Z', '') }}</p>
+</div>
+
+<div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+        <h2 class="card-title">Overview</h2>
+        <p>Analysis based on {{ analysis.total_jobs_analyzed }} jobs from our platform.</p>
+        
+        <div class="stats shadow mt-4">
+            <div class="stat">
+                <div class="stat-title">Total Jobs</div>
+                <div class="stat-value">{{ analysis.total_jobs_analyzed }}</div>
+                <div class="stat-desc">Analyzed for trends</div>
+            </div>
+            
+            <div class="stat">
+                <div class="stat-title">Unique Required Skills</div>
+                <div class="stat-value">{{ analysis.top_required_skills|length }}</div>
+                <div class="stat-desc">Most in-demand skills</div>
+            </div>
+            
+            <div class="stat">
+                <div class="stat-title">Unique Preferred Skills</div>
+                <div class="stat-value">{{ analysis.top_preferred_skills|length }}</div>
+                <div class="stat-desc">Trending secondary skills</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Top Required Skills -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title">Top Required Skills</h2>
+            
+            <div class="mt-4" style="height: 300px">
+                <canvas id="requiredSkillsChart"></canvas>
+            </div>
+            
+            <div class="overflow-x-auto mt-4">
+                <table class="table table-zebra">
+                    <thead>
+                        <tr>
+                            <th>Skill</th>
+                            <th>Count</th>
+                            <th>Percentage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for skill in analysis.top_required_skills %}
+                        <tr>
+                            <td>{{ skill.name }}</td>
+                            <td>{{ skill.count }}</td>
+                            <td>{{ (skill.count / analysis.total_jobs_analyzed * 100)|round(1) }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Top Preferred Skills -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title">Top Preferred Skills</h2>
+            
+            <div class="mt-4" style="height: 300px">
+                <canvas id="preferredSkillsChart"></canvas>
+            </div>
+            
+            <div class="overflow-x-auto mt-4">
+                <table class="table table-zebra">
+                    <thead>
+                        <tr>
+                            <th>Skill</th>
+                            <th>Count</th>
+                            <th>Percentage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for skill in analysis.top_preferred_skills %}
+                        <tr>
+                            <td>{{ skill.name }}</td>
+                            <td>{{ skill.count }}</td>
+                            <td>{{ (skill.count / analysis.total_jobs_analyzed * 100)|round(1) }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Required Skills Chart
+        const requiredCtx = document.getElementById('requiredSkillsChart').getContext('2d');
+        const requiredSkillsChart = new Chart(requiredCtx, {
+            type: 'bar',
+            data: {
+                labels: [{% for skill in analysis.top_required_skills %}'{{ skill.name }}',{% endfor %}],
+                datasets: [{
+                    label: 'Job Count',
+                    data: [{% for skill in analysis.top_required_skills %}{{ skill.count }},{% endfor %}],
+                    backgroundColor: [
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(153, 102, 255, 0.6)',
+                        'rgba(255, 159, 64, 0.6)',
+                        'rgba(255, 99, 132, 0.6)',
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(153, 102, 255, 0.6)',
+                        'rgba(255, 159, 64, 0.6)',
+                        'rgba(255, 99, 132, 0.6)'
+                    ],
+                    borderColor: [
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(255, 99, 132, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Number of Jobs'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Skills'
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Preferred Skills Chart
+        const preferredCtx = document.getElementById('preferredSkillsChart').getContext('2d');
+        const preferredSkillsChart = new Chart(preferredCtx, {
+            type: 'bar',
+            data: {
+                labels: [{% for skill in analysis.top_preferred_skills %}'{{ skill.name }}',{% endfor %}],
+                datasets: [{
+                    label: 'Job Count',
+                    data: [{% for skill in analysis.top_preferred_skills %}{{ skill.count }},{% endfor %}],
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.6)',
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(255, 205, 86, 0.6)',
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(153, 102, 255, 0.6)',
+                        'rgba(255, 99, 132, 0.6)',
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(255, 205, 86, 0.6)',
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(153, 102, 255, 0.6)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(255, 205, 86, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(255, 205, 86, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(153, 102, 255, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Number of Jobs'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Skills'
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

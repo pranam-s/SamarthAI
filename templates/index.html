@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}{{ app_name }} - AI-Powered Job Matching{% endblock %}
+
+{% block content %}
+<div class="hero min-h-[80vh] bg-base-200 rounded-xl">
+    <div class="hero-content flex-col lg:flex-row-reverse">
+        <img src="https://placehold.co/600x400/3b82f6/ffffff?text=AI+Job+Matching&font=Montserrat" class="max-w-sm rounded-lg shadow-2xl" alt="Job Matching" />
+        <div>
+            <h1 class="text-5xl font-bold">AI-Powered Job Matching Platform</h1>
+            <p class="py-6">Find the perfect match between resumes and job descriptions using advanced AI technology. For job seekers, get personalized feedback on your applications. For recruiters, discover the most qualified candidates efficiently.</p>
+            {% if not user %}
+            <div class="flex gap-4">
+                <a href="/register" class="btn btn-primary">Get Started</a>
+                <a href="/login" class="btn btn-outline">Login</a>
+            </div>
+            {% else %}
+            <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="mt-12">
+    <h2 class="text-3xl font-bold text-center mb-8">How It Works</h2>
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h3 class="card-title text-primary">Upload Your Resume</h3>
+                <p>Our AI analyzes your resume, extracting skills, experience, and qualifications automatically.</p>
+            </div>
+        </div>
+        
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h3 class="card-title text-primary">Find Matching Jobs</h3>
+                <p>Get personalized job recommendations based on your skills and experience profile.</p>
+            </div>
+        </div>
+        
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h3 class="card-title text-primary">Improve Your Match</h3>
+                <p>Receive actionable feedback to enhance your resume and increase your match scores.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-12">
+    <h2 class="text-3xl font-bold text-center mb-8">Features</h2>
+    
+    <div class="overflow-x-auto">
+        <table class="table table-zebra w-full">
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Job Seekers</th>
+                    <th>Recruiters</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>AI Resume Analysis</td>
+                    <td><span class="badge badge-primary">Yes</span></td>
+                    <td><span class="badge badge-primary">Yes</span></td>
+                </tr>
+                <tr>
+                    <td>Job Matching</td>
+                    <td><span class="badge badge-primary">Yes</span></td>
+                    <td><span class="badge badge-primary">Yes</span></td>
+                </tr>
+                <tr>
+                    <td>Resume Improvement</td>
+                    <td><span class="badge badge-primary">Yes</span></td>
+                    <td><span class="badge badge-ghost">No</span></td>
+                </tr>
+                <tr>
+                    <td>Application Tracking</td>
+                    <td><span class="badge badge-primary">Yes</span></td>
+                    <td><span class="badge badge-primary">Yes</span></td>
+                </tr>
+                <tr>
+                    <td>Market Analysis</td>
+                    <td><span class="badge badge-ghost">No</span></td>
+                    <td><span class="badge badge-primary">Yes</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

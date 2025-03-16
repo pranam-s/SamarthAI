@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Register - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="flex justify-center">
+    <div class="card w-full max-w-md bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title text-2xl justify-center mb-6">Create Account</h2>
+            
+            <form method="post" action="/register">
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Email</span>
+                    </label>
+                    <input type="email" name="email" placeholder="your@email.com" class="input input-bordered" required />
+                </div>
+                
+                <div class="form-control mt-4">
+                    <label class="label">
+                        <span class="label-text">Full Name</span>
+                    </label>
+                    <input type="text" name="full_name" placeholder="John Doe" class="input input-bordered" required />
+                </div>
+                
+                <div class="form-control mt-4">
+                    <label class="label">
+                        <span class="label-text">Password</span>
+                    </label>
+                    <input type="password" name="password" placeholder="Password" class="input input-bordered" required />
+                </div>
+                
+                <div class="form-control mt-4">
+                    <label class="label cursor-pointer justify-start">
+                        <input type="checkbox" name="is_recruiter" class="checkbox checkbox-primary mr-2" />
+                        <span class="label-text">I am a recruiter</span>
+                    </label>
+                </div>
+                
+                <div class="form-control mt-6">
+                    <button type="submit" class="btn btn-primary">Register</button>
+                </div>
+            </form>
+            
+            <div class="text-center mt-4">
+                <p>Already have an account? <a href="/login" class="link link-primary">Login here</a></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

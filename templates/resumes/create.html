@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Resume - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <h2 class="card-title">Upload Resume</h2>
+        
+        <div class="tabs tabs-boxed mb-6">
+            <a class="tab tab-active" id="file-tab" onclick="switchTab('file')">Upload File</a>
+            <a class="tab" id="text-tab" onclick="switchTab('text')">Paste Text</a>
+        </div>
+        
+        <form method="post" action="/resumes/create" enctype="multipart/form-data" x-data="{ fileName: '' }">
+            <div id="file-section">
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Resume File (PDF, DOCX, or TXT)</span>
+                    </label>
+                    <input 
+                        type="file" 
+                        name="resume_file" 
+                        class="file-input file-input-bordered w-full" 
+                        accept=".pdf,.docx,.doc,.txt"
+                        @change="fileName = $event.target.files[0]?.name"
+                    />
+                    <label class="label" x-show="fileName">
+                        <span class="label-text-alt" x-text="fileName"></span>
+                    </label>
+                </div>
+            </div>
+            
+            <div id="text-section" class="hidden">
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Resume Text</span>
+                    </label>
+                    <textarea name="resume_text" class="textarea textarea-bordered h-64" placeholder="Paste your resume text here..."></textarea>
+                </div>
+            </div>
+            
+            <div class="form-control mt-6">
+                <button type="submit" class="btn btn-primary">Process Resume</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function switchTab(tab) {
+        if (tab === 'file') {
+            document.getElementById('file-tab').classList.add('tab-active');
+            document.getElementById('text-tab').classList.remove('tab-active');
+            document.getElementById('file-section').classList.remove('hidden');
+            document.getElementById('text-section').classList.add('hidden');
+        } else {
+            document.getElementById('file-tab').classList.remove('tab-active');
+            document.getElementById('text-tab').classList.add('tab-active');
+            document.getElementById('file-section').classList.add('hidden');
+            document.getElementById('text-section').classList.remove('hidden');
+        }
+    }
+</script>
+{% endblock %}

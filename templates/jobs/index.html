@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Jobs - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Jobs</h1>
+    {% if user.is_recruiter %}
+    <a href="/jobs/create" class="btn btn-primary">Post New Job</a>
+    {% endif %}
+</div>
+
+{% if jobs %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for job in jobs %}
+    <div class="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow duration-300">
+        <div class="card-body">
+            <h2 class="card-title">{{ job.title }}</h2>
+            <p class="line-clamp-3">{{ job.description_text[:150] }}...</p>
+            
+            <div class="mt-4">
+                <h3 class="font-semibold">Required Skills:</h3>
+                <div class="flex flex-wrap gap-2 mt-1">
+                    {% for skill in job.required_skills[:5] %}
+                    <div class="badge badge-primary">{{ skill.name }}</div>
+                    {% endfor %}
+                    {% if job.required_skills|length > 5 %}
+                    <div class="badge badge-outline">+{{ job.required_skills|length - 5 }} more</div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card-actions justify-end mt-4">
+                <a href="/jobs/{{ job.id }}" class="btn btn-primary btn-sm">View Details</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <h2 class="card-title">No Jobs Found</h2>
+        {% if user.is_recruiter %}
+        <p>You haven't posted any jobs yet. Get started by creating your first job posting.</p>
+        <div class="card-actions justify-end mt-4">
+            <a href="/jobs/create" class="btn btn-primary">Post New Job</a>
+        </div>
+        {% else %}
+        <p>No job postings are available at the moment. Please check back later.</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

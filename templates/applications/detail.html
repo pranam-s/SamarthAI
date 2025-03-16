@@ -1,0 +1,391 @@
+{% extends "base.html" %}
+
+{% block title %}Application Details - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <h1 class="text-2xl font-bold">Application #{{ application.id }}</h1>
+        <p class="text-sm opacity-70">Submitted on {{ application.created_at.strftime('%Y-%m-%d') }}</p>
+    </div>
+    <div>
+        <span class="badge badge-lg {% if application.status == 'Shortlisted' %}badge-success{% elif application.status == 'Rejected' %}badge-error{% else %}badge-info{% endif %}">
+            {{ application.status }}
+        </span>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Application Card -->
+    <div class="card bg-base-100 shadow-xl lg:col-span-2">
+        <div class="card-body">
+            <h2 class="card-title">Match Analysis</h2>
+            
+            <div class="flex justify-center my-6">
+                <div class="radial-progress text-primary" style="--value:{{ match_score }}; --size:10rem; --thickness: 12px;">
+                    <span class="text-3xl font-bold">{{ match_score|round }}%</span>
+                </div>
+            </div>
+            
+            <div class="tabs tabs-boxed mb-4">
+                <a class="tab tab-active" id="details-tab" onclick="switchTab('details')">Match Details</a>
+                <a class="tab" id="feedback-tab" onclick="switchTab('feedback')">Feedback</a>
+            </div>
+            
+            <!-- Match Details Section -->
+            <div id="details-section">
+                {% if match_details %}
+                
+                <!-- Skills Section -->
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg">Skills Match</h3>
+                    <p class="text-sm">Score: {{ match_details.sections.skills.score|round }}%</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div class="card bg-base-200">
+                            <div class="card-body p-4">
+                                <h4 class="font-semibold">Required Skills</h4>
+                                <p class="text-sm">Match rate: {{ match_details.sections.skills.required.match_rate|round }}%</p>
+                                
+                                {% if match_details.sections.skills.required.matched %}
+                                <div class="mt-2">
+                                    <span class="text-sm font-medium">Matched:</span>
+                                    <div class="flex flex-wrap gap-2 mt-1">
+                                        {% for skill in match_details.sections.skills.required.matched %}
+                                        <div class="badge badge-success">{{ skill }}</div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                {% if match_details.sections.skills.required.missing %}
+                                <div class="mt-2">
+                                    <span class="text-sm font-medium">Missing:</span>
+                                    <div class="flex flex-wrap gap-2 mt-1">
+                                        {% for skill in match_details.sections.skills.required.missing %}
+                                        <div class="badge badge-error">{{ skill }}</div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="card bg-base-200">
+                            <div class="card-body p-4">
+                                <h4 class="font-semibold">Preferred Skills</h4>
+                                <p class="text-sm">Match rate: {{ match_details.sections.skills.preferred.match_rate|round }}%</p>
+                                
+                                {% if match_details.sections.skills.preferred.matched %}
+                                <div class="mt-2">
+                                    <span class="text-sm font-medium">Matched:</span>
+                                    <div class="flex flex-wrap gap-2 mt-1">
+                                        {% for skill in match_details.sections.skills.preferred.matched %}
+                                        <div class="badge badge-success">{{ skill }}</div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                {% if match_details.sections.skills.preferred.missing %}
+                                <div class="mt-2">
+                                    <span class="text-sm font-medium">Missing:</span>
+                                    <div class="flex flex-wrap gap-2 mt-1">
+                                        {% for skill in match_details.sections.skills.preferred.missing %}
+                                        <div class="badge badge-warning">{{ skill }}</div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Experience Section -->
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg">Experience Match</h3>
+                    <p class="text-sm">Score: {{ match_details.sections.experience.score|round }}%</p>
+                    
+                    <div class="card bg-base-200 mt-4">
+                        <div class="card-body p-4">
+                            {% if match_details.sections.experience.matching_aspects %}
+                            <div class="mt-2">
+                                <span class="text-sm font-medium">Matching Aspects:</span>
+                                <ul class="list-disc list-inside mt-1">
+                                    {% for aspect in match_details.sections.experience.matching_aspects %}
+                                    <li>{{ aspect }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                            
+                            {% if match_details.sections.experience.missing_aspects %}
+                            <div class="mt-2">
+                                <span class="text-sm font-medium">Missing Aspects:</span>
+                                <ul class="list-disc list-inside mt-1">
+                                    {% for aspect in match_details.sections.experience.missing_aspects %}
+                                    <li>{{ aspect }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                            
+                            {% if match_details.sections.experience.experience_entries %}
+                            <div class="mt-4">
+                                <span class="text-sm font-medium">Experience Analysis:</span>
+                                <div class="space-y-2 mt-2">
+                                    {% for entry in match_details.sections.experience.experience_entries %}
+                                    <div class="flex justify-between items-center p-2 bg-base-300 rounded-lg">
+                                        <div>
+                                            <span class="font-medium">{{ entry.role }}</span>
+                                            <p class="text-xs">{{ entry.company }}</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <span class="font-medium">{{ entry.match_percentage|round }}%</span>
+                                            {% if entry.matching_terms %}
+                                            <div class="flex flex-wrap gap-1 mt-1 justify-end">
+                                                {% for term in entry.matching_terms %}
+                                                <span class="badge badge-xs badge-info">{{ term }}</span>
+                                                {% endfor %}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Education Section -->
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg">Education Match</h3>
+                    <p class="text-sm">Score: {{ match_details.sections.education.score|round }}%</p>
+                    
+                    <div class="card bg-base-200 mt-4">
+                        <div class="card-body p-4">
+                            {% if match_details.sections.education.highest_education %}
+                            <p><span class="font-medium">Highest Education:</span> {{ match_details.sections.education.highest_education|capitalize }}</p>
+                            {% endif %}
+                            
+                            {% if match_details.sections.education.matching_aspects %}
+                            <div class="mt-2">
+                                <span class="text-sm font-medium">Matching Aspects:</span>
+                                <ul class="list-disc list-inside mt-1">
+                                    {% for aspect in match_details.sections.education.matching_aspects %}
+                                    <li>{{ aspect }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                            
+                            {% if match_details.sections.education.missing_aspects %}
+                            <div class="mt-2">
+                                <span class="text-sm font-medium">Missing Aspects:</span>
+                                <ul class="list-disc list-inside mt-1">
+                                    {% for aspect in match_details.sections.education.missing_aspects %}
+                                    <li>{{ aspect }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Weights Applied -->
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg">Match Weights</h3>
+                    
+                    <div class="flex flex-wrap gap-4 mt-4">
+                        {% for section, weight in match_details.weights_applied.items() %}
+                        <div class="badge badge-lg">{{ section|capitalize }}: {{ weight*100 }}%</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                {% else %}
+                <div class="alert">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>No detailed match data available.</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Feedback Section -->
+            <div id="feedback-section" class="hidden">
+                {% if feedback %}
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg">Strengths</h3>
+                    {% if feedback.strengths %}
+                    <ul class="list-disc list-inside mt-2">
+                        {% for strength in feedback.strengths %}
+                        <li>{{ strength }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="mt-2">No specific strengths identified.</p>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg">Improvement Areas</h3>
+                    {% if feedback.improvements %}
+                    <ul class="list-disc list-inside mt-2">
+                        {% for improvement in feedback.improvements %}
+                        <li>{{ improvement }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="mt-2">No specific improvements identified.</p>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg">Missing Skills</h3>
+                    {% if feedback.missing_skills %}
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        {% for skill in feedback.missing_skills %}
+                        <div class="badge badge-error badge-lg">{{ skill }}</div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="mt-2">No specific missing skills identified.</p>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg">Recommended Keywords</h3>
+                    {% if feedback.keyword_recommendations %}
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        {% for keyword in feedback.keyword_recommendations %}
+                        <div class="badge badge-info badge-lg">{{ keyword }}</div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="mt-2">No specific keyword recommendations.</p>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="alert">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>No feedback data available.</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sidebar Cards -->
+    <div class="space-y-6">
+        <!-- Job Details -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title">Job Details</h2>
+                <p class="font-bold text-lg">{{ job.title }}</p>
+                <p class="line-clamp-3">{{ job.description_text[:100] }}...</p>
+                
+                <div class="mt-4">
+                    <h3 class="font-semibold">Required Skills</h3>
+                    <div class="flex flex-wrap gap-2 mt-1">
+                        {% for skill in job.required_skills[:5] %}
+                        <div class="badge badge-primary">{{ skill.name }}</div>
+                        {% endfor %}
+                        {% if job.required_skills|length > 5 %}
+                        <div class="badge badge-outline">+{{ job.required_skills|length - 5 }} more</div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="card-actions justify-end mt-4">
+                    <a href="/jobs/{{ job.id }}" class="btn btn-sm btn-outline">View Full Job</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Applicant Details -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title">Applicant Details</h2>
+                <div class="overflow-x-auto">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <td class="font-medium">Name</td>
+                                <td>{{ application.full_name }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-medium">Email</td>
+                                <td>{{ application.email }}</td>
+                            </tr>
+                            {% if application.phone %}
+                            <tr>
+                                <td class="font-medium">Phone</td>
+                                <td>{{ application.phone }}</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="card-actions justify-end mt-4">
+                    <a href="/resumes/{{ resume.id }}" class="btn btn-sm btn-outline">View Resume</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Status Update (Recruiters Only) -->
+        {% if user.is_recruiter and job.company_id == user.id %}
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title">Update Status</h2>
+                
+                <form method="post" action="/applications/{{ application.id }}/update-status">
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Application Status</span>
+                        </label>
+                        <select name="status" class="select select-bordered w-full">
+                            <option value="New" {% if application.status == 'New' %}selected{% endif %}>New</option>
+                            <option value="Reviewed" {% if application.status == 'Reviewed' %}selected{% endif %}>Reviewed</option>
+                            <option value="Shortlisted" {% if application.status == 'Shortlisted' %}selected{% endif %}>Shortlisted</option>
+                            <option value="Rejected" {% if application.status == 'Rejected' %}selected{% endif %}>Rejected</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-control mt-4">
+                        <button type="submit" class="btn btn-primary">Update Status</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function switchTab(tab) {
+        if (tab === 'details') {
+            document.getElementById('details-tab').classList.add('tab-active');
+            document.getElementById('feedback-tab').classList.remove('tab-active');
+            document.getElementById('details-section').classList.remove('hidden');
+            document.getElementById('feedback-section').classList.add('hidden');
+        } else {
+            document.getElementById('details-tab').classList.remove('tab-active');
+            document.getElementById('feedback-tab').classList.add('tab-active');
+            document.getElementById('details-section').classList.add('hidden');
+            document.getElementById('feedback-section').classList.remove('hidden');
+        }
+    }
+    
+    // Initialize Chart.js for visualization if needed
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add any charts here if needed
+    });
+</script>
+{% endblock %}

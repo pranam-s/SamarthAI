@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Resumes - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Your Resumes</h1>
+    <a href="/resumes/create" class="btn btn-primary">Upload Resume</a>
+</div>
+
+{% if resumes %}
+<div class="overflow-x-auto">
+    <table class="table table-zebra w-full">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Skills</th>
+                <th>Experience</th>
+                <th>Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for resume in resumes %}
+            <tr class="hover">
+                <td>{{ resume.id }}</td>
+                <td>{{ resume.parsed_sections.get('contact', {}).get('name', 'Unnamed Resume') }}</td>
+                <td>{{ resume.skills|length if resume.skills else 0 }} skills</td>
+                <td>{{ resume.experience|length if resume.experience else 0 }} entries</td>
+                <td>{{ resume.created_at.strftime('%Y-%m-%d') }}</td>
+                <td>
+                    <a href="/resumes/{{ resume.id }}" class="btn btn-xs btn-outline">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <h2 class="card-title">No Resumes Found</h2>
+        <p>You haven't uploaded any resumes yet. Get started by uploading your first resume.</p>
+        <div class="card-actions justify-end mt-4">
+            <a href="/resumes/create" class="btn btn-primary">Upload Resume</a>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

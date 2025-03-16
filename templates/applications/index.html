@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Applications - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Applications</h1>
+</div>
+
+{% if applications %}
+<div class="overflow-x-auto">
+    <table class="table table-zebra w-full">
+        <thead>
+            <tr>
+                {% if user.is_recruiter %}
+                <th>Applicant</th>
+                <th>Job</th>
+                {% else %}
+                <th>Job</th>
+                <th>Resume</th>
+                {% endif %}
+                <th>Match Score</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for app in applications %}
+            <tr class="hover">
+                {% if user.is_recruiter %}
+                <td>{{ app.full_name }}</td>
+                <td>{{ app.job_title }}</td>
+                {% else %}
+                <td>{{ app.job_title }}</td>
+                <td>{{ app.resume_name }}</td>
+                {% endif %}
+                <td>
+                    <div class="radial-progress text-xs" style="--value:{{ app.match_score }}; --size:2rem;">{{ app.match_score|round }}%</div>
+                </td>
+                <td>
+                    <span class="badge {% if app.status == 'Shortlisted' %}badge-success{% elif app.status == 'Rejected' %}badge-error{% else %}badge-info{% endif %}">
+                        {{ app.status }}
+                    </span>
+                </td>
+                <td>{{ app.created_at.strftime('%Y-%m-%d') }}</td>
+                <td>
+                    <a href="/applications/{{ app.id }}" class="btn btn-xs btn-outline">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <h2 class="card-title">No Applications Found</h2>
+        {% if user.is_recruiter %}
+        <p>You haven't received any applications yet.</p>
+        {% else %}
+        <p>You haven't applied to any jobs yet.</p>
+        <div class="card-actions justify-end mt-4">
+            <a href="/jobs" class="btn btn-primary">Browse Jobs</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

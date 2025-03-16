@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block title %}Resume Details - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Resume #{{ resume.id }}</h1>
+    <div class="flex gap-2">
+        {% if not user.is_recruiter %}
+        <form method="post" action="/resumes/{{ resume.id }}/delete" onsubmit="return confirm('Are you sure you want to delete this resume?');">
+            <button type="submit" class="btn btn-error btn-outline">Delete</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Resume Card -->
+    <div class="card bg-base-100 shadow-xl lg:col-span-2">
+        <div class="card-body">
+            <h2 class="card-title">Resume Information</h2>
+            
+            <div class="tabs tabs-boxed mb-4">
+                <a class="tab tab-active" id="parsed-tab" onclick="switchTab('parsed')">Parsed Data</a>
+                <a class="tab" id="raw-tab" onclick="switchTab('raw')">Raw Text</a>
+            </div>
+            
+            <!-- Parsed Resume Data -->
+            <div id="parsed-section">
+                {% if resume.parsed_sections %}
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg">Contact Information</h3>
+                    <div class="overflow-x-auto">
+                        <table class="table">
+                            <tbody>
+                                {% if resume.parsed_sections.get('contact') %}
+                                {% for key, value in resume.parsed_sections.get('contact').items() %}
+                                {% if value %}
+                                <tr>
+                                    <td class="font-medium capitalize">{{ key }}</td>
+                                    <td>{{ value }}</td>
+                                </tr>
+                                {% endif %}
+                                {% endfor %}
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                {% if resume.skills %}
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg">Skills</h3>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        {% for skill in resume.skills %}
+                        <div class="badge badge-lg">
+                            {{ skill.name }}
+                            {% if skill.proficiency %}
+                            <span class="ml-1 opacity-70">({{ skill.proficiency }})</span>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if resume.experience %}
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg">Experience</h3>
+                    <div class="space-y-4 mt-2">
+                        {% for exp in resume.experience %}
+                        <div class="card bg-base-200">
+                            <div class="card-body p-4">
+                                <h4 class="font-bold">{{ exp.role }} at {{ exp.company }}</h4>
+                                <p class="text-sm opacity-70">
+                                    {{ exp.start_date or 'N/A' }} to {{ exp.end_date or 'Present' }}
+                                </p>
+                                {% if exp.description %}
+                                <p>{{ exp.description }}</p>
+                                {% endif %}
+                                {% if exp.achievements %}
+                                <ul class="list-disc list-inside mt-2">
+                                    {% for achievement in exp.achievements %}
+                                    <li>{{ achievement }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if resume.education %}
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg">Education</h3>
+                    <div class="space-y-4 mt-2">
+                        {% for edu in resume.education %}
+                        <div class="card bg-base-200">
+                            <div class="card-body p-4">
+                                <h4 class="font-bold">{{ edu.degree }}{% if edu.field_of_study %} in {{ edu.field_of_study }}{% endif %}</h4>
+                                <p>{{ edu.institution }}</p>
+                                <p class="text-sm opacity-70">
+                                    {{ edu.start_date or 'N/A' }} to {{ edu.end_date or 'Present' }}
+                                    {% if edu.gpa %}• GPA: {{ edu.gpa }}{% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if resume.projects %}
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg">Projects</h3>
+                    <div class="space-y-4 mt-2">
+                        {% for project in resume.projects %}
+                        <div class="card bg-base-200">
+                            <div class="card-body p-4">
+                                <h4 class="font-bold">{{ project.name }}</h4>
+                                {% if project.description %}
+                                <p>{{ project.description }}</p>
+                                {% endif %}
+                                {% if project.technologies %}
+                                <div class="flex flex-wrap gap-1 mt-2">
+                                    {% for tech in project.technologies %}
+                                    <span class="badge badge-sm">{{ tech }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                {% if project.url %}
+                                <a href="{{ project.url }}" target="_blank" class="link link-primary text-sm">Project Link</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if resume.certifications %}
+                <div class="mb-6">
+                    <h3 class="font-bold text-lg">Certifications</h3>
+                    <div class="space-y-2 mt-2">
+                        {% for cert in resume.certifications %}
+                        <div class="card bg-base-200">
+                            <div class="card-body p-4">
+                                <h4 class="font-bold">{{ cert.name }}</h4>
+                                {% if cert.issuer %}
+                                <p>Issued by: {{ cert.issuer }}</p>
+                                {% endif %}
+                                {% if cert.date %}
+                                <p class="text-sm opacity-70">Date: {{ cert.date }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="alert">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>No parsed data available for this resume.</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Raw Resume Text -->
+            <div id="raw-section" class="hidden">
+                <pre class="bg-base-200 p-4 rounded-lg overflow-x-auto max-h-[500px] whitespace-pre-wrap">{{ resume.full_text }}</pre>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sidebar Cards -->
+    <div class="space-y-6">
+        <!-- Resume Quality Score -->
+        {% if quality_score %}
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title">Quality Score</h2>
+                
+                <div class="flex justify-center my-4">
+                    <div class="radial-progress text-primary" style="--value:{{ quality_score.overall_score }}; --size:8rem; --thickness: 10px;">
+                        <span class="text-2xl font-bold">{{ quality_score.overall_score|round }}%</span>
+                    </div>
+                </div>
+                
+                {% if quality_score.sections %}
+                <div class="space-y-2">
+                    {% for section_name, score in quality_score.sections.items() %}
+                    <div class="flex items-center justify-between">
+                        <span class="capitalize">{{ section_name }}</span>
+                        <div class="flex items-center">
+                            <span class="mr-2">{{ score }}%</span>
+                            <progress class="progress {% if score < 40 %}progress-error{% elif score < 70 %}progress-warning{% else %}progress-success{% endif %}" value="{{ score }}" max="100"></progress>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                {% if quality_score.suggestions %}
+                <div class="mt-4">
+                    <h3 class="font-semibold">Suggestions</h3>
+                    <ul class="list-disc list-inside mt-2">
+                        {% for suggestion in quality_score.suggestions %}
+                        <li>{{ suggestion }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Improvement Suggestions -->
+        {% if improvement %}
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title">Improvement Suggestions</h2>
+                
+                {% if improvement.format %}
+                <div class="mt-4">
+                    <h3 class="font-semibold">Format</h3>
+                    <ul class="list-disc list-inside mt-2">
+                        {% for item in improvement.format %}
+                        <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                
+                {% if improvement.bullet_points %}
+                <div class="mt-4">
+                    <h3 class="font-semibold">Bullet Points</h3>
+                    <ul class="list-disc list-inside mt-2">
+                        {% for item in improvement.bullet_points %}
+                        <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                
+                {% if improvement.keywords %}
+                <div class="mt-4">
+                    <h3 class="font-semibold">Suggested Keywords</h3>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        {% for keyword in improvement.keywords %}
+                        <div class="badge badge-primary badge-outline">{{ keyword }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if improvement.skills %}
+                <div class="mt-4">
+                    <h3 class="font-semibold">Skills to Highlight</h3>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        {% for skill in improvement.skills %}
+                        <div class="badge badge-secondary badge-outline">{{ skill }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Job Recommendations -->
+        {% if recommendations %}
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title">Job Recommendations</h2>
+                
+                <div class="space-y-4 mt-2">
+                    {% for job in recommendations %}
+                    <div class="bg-base-200 p-4 rounded-lg">
+                        <h3 class="font-bold">{{ job.title }}</h3>
+                        <p class="line-clamp-2 text-sm mt-1">{{ job.description_text[:100] }}...</p>
+                        <a href="/jobs/{{ job.id }}" class="btn btn-sm btn-outline mt-2">View Job</a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function switchTab(tab) {
+        if (tab === 'parsed') {
+            document.getElementById('parsed-tab').classList.add('tab-active');
+            document.getElementById('raw-tab').classList.remove('tab-active');
+            document.getElementById('parsed-section').classList.remove('hidden');
+            document.getElementById('raw-section').classList.add('hidden');
+        } else {
+            document.getElementById('parsed-tab').classList.remove('tab-active');
+            document.getElementById('raw-tab').classList.add('tab-active');
+            document.getElementById('parsed-section').classList.add('hidden');
+            document.getElementById('raw-section').classList.remove('hidden');
+        }
+    }
+</script>
+{% endblock %}
