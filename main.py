@@ -1,19 +1,20 @@
-import os
 import logging
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-import asyncio
+
 from api import router as api_router
-from ui import router as ui_router
 from core.config import settings
 from db.database import Base, engine
+from ui import router as ui_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+os.makedirs("static", exist_ok=True)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -22,7 +23,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

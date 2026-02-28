@@ -1,44 +1,69 @@
 import base64
 import io
-import os
-from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any, Annotated
-from collections import Counter
 import re
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from collections import Counter
+from datetime import datetime, timedelta
+from typing import Annotated, Any
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
-from core.security import create_access_token, verify_password, get_password_hash, ALGORITHM
+from core.security import ALGORITHM, create_access_token, get_password_hash, verify_password
 from db.database import get_db
 from models import User
 from schemas import (
-    Token, TokenPayload, UserCreate, User as UserSchema, Resume, ResumeUpload,
-    Job, JobCreate, JobUpdate, Application, ApplicationCreate, ApplicationWithDetails,
-    MatchRequest, MatchResponse
+    Application,
+    ApplicationCreate,
+    ApplicationWithDetails,
+    Job,
+    JobCreate,
+    JobUpdate,
+    MatchRequest,
+    MatchResponse,
+    Resume,
+    ResumeUpload,
+    Token,
+    TokenPayload,
+    UserCreate,
 )
-from services import resume_service, job_service, matching_service, user_service, ai_service
+from schemas import User as UserSchema
+from services import ai_service, job_service, matching_service, resume_service, user_service
 
 router = APIRouter(prefix=settings.API_V1_STR)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
 
 
 async def get_current_user(
-    db: Annotated[AsyncSession, Depends(get_db)], token: Annotated[str, Depends(oauth2_scheme)]
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    token: Annotated[str | None, Depends(oauth2_scheme)],
 ) -> User:
-    try:
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[ALGORITHM]
-        )
-        token_data = TokenPayload(**payload)
-    except (JWTError, ValidationError):
+    raw_cookie_token = request.cookies.get(settings.AUTH_COOKIE_NAME)
+    selected_token = token or raw_cookie_token
+
+    if not selected_token:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not validate credentials",
         )
+
+    if selected_token.startswith("Bearer "):
+        selected_token = selected_token.replace("Bearer ", "", 1)
+
+    try:
+        payload = jwt.decode(
+            selected_token, settings.SECRET_KEY, algorithms=[ALGORITHM]
+        )
+        token_data = TokenPayload(**payload)
+    except (JWTError, ValidationError) as err:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not validate credentials",
+        ) from err
     
     user = await user_service.get_user_by_id(db, token_data.sub)
     if not user:
@@ -94,7 +119,7 @@ async def register_user(
             detail="User with this email already exists",
         )
     
-    user_data = user_in.dict()
+    user_data = user_in.model_dump()
     hashed_password = get_password_hash(user_in.password)
     user = await user_service.create_user(db, user_data, hashed_password)
     return user
@@ -104,8 +129,8 @@ async def register_user(
 async def create_resume(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-    file: Annotated[UploadFile, Form()]=None,
-    resume_data: Annotated[Optional[str], Form()]=None
+    file: UploadFile | None = File(None),
+    resume_data: Annotated[str | None, Form()] = None,
 ) -> Any:
     if file is None and resume_data is None:
         raise HTTPException(
@@ -136,11 +161,11 @@ async def create_resume_base64(
 
     try:
         file_content = base64.b64decode(resume_upload.file_content)
-    except Exception:
+    except Exception as err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid base64 encoding",
-        )
+        ) from err
     
     file = UploadFile(
         filename=resume_upload.file_name,
@@ -152,7 +177,7 @@ async def create_resume_base64(
     return resume
 
 
-@router.get("/resumes", response_model=List[Resume])
+@router.get("/resumes", response_model=list[Resume])
 async def read_resumes(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
@@ -223,11 +248,11 @@ async def create_job(
         )
     
     result = await job_service.process_job_description(job_in.description_text)
-    job = await job_service.create_job(db, current_user.id, result, job_in.dict())
+    job = await job_service.create_job(db, current_user.id, result, job_in.model_dump())
     return job
 
 
-@router.get("/jobs", response_model=List[Job])
+@router.get("/jobs", response_model=list[Job])
 async def read_jobs(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
@@ -275,7 +300,7 @@ async def update_job(
             detail="Not enough permissions",
         )
     
-    job_data = job_in.dict(exclude_unset=True)
+    job_data = job_in.model_dump(exclude_unset=True)
     
     if "description_text" in job_data and job_data["description_text"] != job.description_text:
         result = await job_service.process_job_description(job_data["description_text"])
@@ -353,7 +378,7 @@ async def create_application(
     
     application = await matching_service.create_application(
         db, 
-        application_in.dict(), 
+        application_in.model_dump(), 
         score, 
         match_details, 
         feedback
@@ -361,14 +386,14 @@ async def create_application(
     return application
 
 
-@router.get("/applications", response_model=List[Application])
+@router.get("/applications", response_model=list[Application])
 async def read_applications(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     skip: int = 0,
     limit: int = 100,
-    job_id: Optional[int] = None,
-    status: Optional[str] = None
+    job_id: int | None = None,
+    status: str | None = None
 ) -> Any:
     applications = await matching_service.get_applications(
         db, 
@@ -405,9 +430,9 @@ async def read_application(
             detail="Not enough permissions",
         )
     
-    application_with_details = ApplicationWithDetails.from_orm(application)
-    application_with_details.job = Job.from_orm(job)
-    application_with_details.resume = Resume.from_orm(resume)
+    application_with_details = ApplicationWithDetails.model_validate(application)
+    application_with_details.job = Job.model_validate(job)
+    application_with_details.resume = Resume.model_validate(resume)
     
     return application_with_details
 
@@ -415,7 +440,7 @@ async def read_application(
 @router.patch("/applications/{id}/status", response_model=Application)
 async def update_application_status(
     id: int,
-    status: str,
+    status_value: str,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Any:
@@ -426,7 +451,7 @@ async def update_application_status(
         )
     
     valid_statuses = ["New", "Reviewed", "Shortlisted", "Rejected"]
-    if status not in valid_statuses:
+    if status_value not in valid_statuses:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}",
@@ -448,7 +473,7 @@ async def update_application_status(
             detail="Not enough permissions",
         )
     
-    updated_application = await matching_service.update_application_status(db, id, status)
+    updated_application = await matching_service.update_application_status(db, id, status_value)
     return updated_application
 
 
@@ -497,7 +522,7 @@ async def match_resume_to_job(
         "feedback": feedback
     }
 
-@router.get("/recommendations/{resume_id}", response_model=List[Job])
+@router.get("/recommendations/{resume_id}", response_model=list[Job])
 async def get_job_recommendations(
     resume_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -533,7 +558,7 @@ async def get_job_recommendations(
     top_jobs = [job for job, _ in job_scores[:limit]]
     return top_jobs
 
-@router.get("/resumes/{id}/improve", response_model=Dict[str, Any])
+@router.get("/resumes/{id}/improve", response_model=dict[str, Any])
 async def get_resume_improvement(
     id: int,
     db: AsyncSession = Depends(get_db),
@@ -568,7 +593,7 @@ async def get_resume_improvement(
     improvement_suggestions = await ai_service.call_gemini(prompt)
     return improvement_suggestions
 
-@router.get("/market-analysis", response_model=Dict[str, Any])
+@router.get("/market-analysis", response_model=dict[str, Any])
 async def get_job_market_analysis(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -603,7 +628,7 @@ async def get_job_market_analysis(
         "analysis_date": datetime.utcnow().isoformat()
     }
 
-@router.get("/resumes/{id}/quality-score", response_model=Dict[str, Any])
+@router.get("/resumes/{id}/quality-score", response_model=dict[str, Any])
 async def get_resume_quality_score(
     id: int,
     db: AsyncSession = Depends(get_db),

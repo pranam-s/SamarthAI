@@ -1,11 +1,11 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
-import base64
+from typing import Any
+
+from pydantic import BaseModel, EmailStr
 
 
 class TokenPayload(BaseModel):
-    sub: Optional[int] = None
+    sub: int | None = None
 
 
 class Token(BaseModel):
@@ -15,7 +15,7 @@ class Token(BaseModel):
 
 class UserBase(BaseModel):
     email: EmailStr
-    full_name: Optional[str] = None
+    full_name: str | None = None
     is_recruiter: bool = False
 
 
@@ -24,14 +24,14 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(UserBase):
-    password: Optional[str] = None
+    password: str | None = None
 
 
 class UserInDB(UserBase):
     id: int
     is_active: bool
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
     hashed_password: str
 
     class Config:
@@ -42,7 +42,7 @@ class User(UserBase):
     id: int
     is_active: bool
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -50,58 +50,58 @@ class User(UserBase):
 
 class SkillBase(BaseModel):
     name: str
-    proficiency: Optional[str] = None
-    context: Optional[str] = None
+    proficiency: str | None = None
+    context: str | None = None
 
 
 class ExperienceBase(BaseModel):
     role: str
     company: str
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    description: Optional[str] = None
-    achievements: Optional[List[str]] = []
+    start_date: str | None = None
+    end_date: str | None = None
+    description: str | None = None
+    achievements: list[str] | None = []
 
 
 class EducationBase(BaseModel):
     institution: str
     degree: str
-    field_of_study: Optional[str] = None
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    gpa: Optional[str] = None
-    extras: Optional[str] = None
+    field_of_study: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    gpa: str | None = None
+    extras: str | None = None
 
 
 class ProjectBase(BaseModel):
     name: str
-    description: Optional[str] = None
-    technologies: Optional[List[str]] = []
-    url: Optional[str] = None
+    description: str | None = None
+    technologies: list[str] | None = []
+    url: str | None = None
 
 
 class CertificationBase(BaseModel):
     name: str
-    issuer: Optional[str] = None
-    date: Optional[str] = None
-    expires: Optional[str] = None
+    issuer: str | None = None
+    date: str | None = None
+    expires: str | None = None
 
 
 class AchievementBase(BaseModel):
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class ResumeBase(BaseModel):
-    user_id: Optional[int] = None
-    full_text: Optional[str] = None
-    parsed_sections: Optional[Dict[str, Any]] = {}
-    skills: Optional[List[Dict[str, Any]]] = []
-    experience: Optional[List[Dict[str, Any]]] = []
-    education: Optional[List[Dict[str, Any]]] = []
-    projects: Optional[List[Dict[str, Any]]] = []
-    certifications: Optional[List[Dict[str, Any]]] = []
-    achievements: Optional[List[Dict[str, Any]]] = []
-    file_type: Optional[str] = None
+    user_id: int | None = None
+    full_text: str | None = None
+    parsed_sections: dict[str, Any] | None = {}
+    skills: list[dict[str, Any]] | None = []
+    experience: list[dict[str, Any]] | None = []
+    education: list[dict[str, Any]] | None = []
+    projects: list[dict[str, Any]] | None = []
+    certifications: list[dict[str, Any]] | None = []
+    achievements: list[dict[str, Any]] | None = []
+    file_type: str | None = None
 
 
 class ResumeCreate(ResumeBase):
@@ -114,34 +114,34 @@ class ResumeUpdate(ResumeBase):
 
 class Resume(ResumeBase):
     id: int
-    file_path: Optional[str] = None
+    file_path: str | None = None
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     class Config:
         from_attributes = True
 
 
 class ResumeUpload(BaseModel):
-    file_content: Optional[str] = None
+    file_content: str | None = None
     file_type: str
     file_name: str
 
 
 class SkillRequirement(BaseModel):
     name: str
-    importance: Optional[float] = 1.0
+    importance: float | None = 1.0
 
 
 class JobBase(BaseModel):
-    company_id: Optional[int] = None
+    company_id: int | None = None
     title: str
     description_text: str
-    required_skills: Optional[List[Dict[str, Any]]] = []
-    preferred_skills: Optional[List[Dict[str, Any]]] = []
-    responsibilities: Optional[List[str]] = []
-    qualifications: Optional[List[str]] = []
-    priority_weights: Optional[Dict[str, float]] = {"skills": 0.6, "experience": 0.3, "education": 0.1}
+    required_skills: list[dict[str, Any]] | None = []
+    preferred_skills: list[dict[str, Any]] | None = []
+    responsibilities: list[str] | None = []
+    qualifications: list[str] | None = []
+    priority_weights: dict[str, float] | None = {"skills": 0.6, "experience": 0.3, "education": 0.1}
 
 
 class JobCreate(JobBase):
@@ -155,7 +155,7 @@ class JobUpdate(JobBase):
 class Job(JobBase):
     id: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -166,7 +166,7 @@ class ApplicationBase(BaseModel):
     resume_id: int
     full_name: str
     email: str
-    phone: Optional[str] = None
+    phone: str | None = None
 
 
 class ApplicationCreate(ApplicationBase):
@@ -174,28 +174,28 @@ class ApplicationCreate(ApplicationBase):
 
 
 class ApplicationUpdate(BaseModel):
-    status: Optional[str] = None
-    match_score: Optional[float] = None
-    match_details: Optional[Dict[str, Any]] = None
-    feedback: Optional[Dict[str, Any]] = None
+    status: str | None = None
+    match_score: float | None = None
+    match_details: dict[str, Any] | None = None
+    feedback: dict[str, Any] | None = None
 
 
 class Application(ApplicationBase):
     id: int
     match_score: float
-    match_details: Dict[str, Any]
-    feedback: Dict[str, Any]
+    match_details: dict[str, Any]
+    feedback: dict[str, Any]
     status: str
     created_at: datetime
-    reviewed_at: Optional[datetime] = None
+    reviewed_at: datetime | None = None
 
     class Config:
         from_attributes = True
 
 
 class ApplicationWithDetails(Application):
-    job: Optional[Job] = None
-    resume: Optional[Resume] = None
+    job: Job | None = None
+    resume: Resume | None = None
 
 
 class MatchRequest(BaseModel):
@@ -207,13 +207,13 @@ class MatchResponse(BaseModel):
     resume_id: int
     job_id: int
     match_score: float
-    match_details: Dict[str, Any]
-    feedback: Dict[str, Any]
+    match_details: dict[str, Any]
+    feedback: dict[str, Any]
 
 
 class SkillMatchSection(BaseModel):
-    matched: List[str] = []
-    missing: List[str] = []
+    matched: list[str] = []
+    missing: list[str] = []
     match_rate: float = 0.0
 
 
@@ -227,21 +227,21 @@ class ExperienceEntryMatch(BaseModel):
     role: str
     company: str
     match_percentage: float = 0.0
-    matching_terms: List[str] = []
+    matching_terms: list[str] = []
 
 
 class ExperienceMatch(BaseModel):
     score: float = 0.0
-    matching_aspects: List[str] = []
-    missing_aspects: List[str] = []
-    experience_entries: List[Dict[str, Any]] = []
+    matching_aspects: list[str] = []
+    missing_aspects: list[str] = []
+    experience_entries: list[dict[str, Any]] = []
 
 
 class EducationMatch(BaseModel):
     score: float = 0.0
-    matching_aspects: List[str] = []
-    missing_aspects: List[str] = []
-    highest_education: Optional[str] = None
+    matching_aspects: list[str] = []
+    missing_aspects: list[str] = []
+    highest_education: str | None = None
 
 
 class MatchSections(BaseModel):

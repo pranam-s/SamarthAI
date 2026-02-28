@@ -1,53 +1,77 @@
-import json
-from typing import Optional, List, Dict, Any, Annotated
-from fastapi import APIRouter, Request, Depends, Form, File, UploadFile, HTTPException, status
+from datetime import datetime, timedelta
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timedelta
 
+from api import get_current_user
 from core.config import settings
-from core.security import create_access_token
+from core.i18n import normalize_locale, translate
+from core.security import (
+    create_access_token,
+    create_csrf_token,
+    decode_access_token,
+    verify_csrf_token,
+    verify_password,
+)
 from db.database import get_db
 from models import User
-from api import get_current_user
-from services import resume_service, job_service, matching_service, user_service
+from schemas import TokenPayload
+from services import job_service, matching_service, resume_service, user_service
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
 # Helper for template context
-async def get_user_context(request: Request, current_user: Optional[User] = None):
+async def get_user_context(request: Request, current_user: User | None = None):
+    locale_cookie = request.cookies.get("locale")
+    locale_header = request.headers.get("accept-language")
+    locale = normalize_locale(locale_cookie or locale_header or settings.DEFAULT_LOCALE)
+
+    csrf_token = create_csrf_token(current_user.id) if current_user else ""
+
     return {
         "request": request,
         "user": current_user,
         "app_name": settings.PROJECT_NAME,
-        "now": datetime.now()
+        "now": datetime.now(),
+        "locale": locale,
+        "supported_locales": settings.SUPPORTED_LOCALES,
+        "csrf_token": csrf_token,
+        "t": lambda key: translate(locale, key),
     }
+
+
+def validate_csrf_or_400(current_user: User, csrf_token: str):
+    if not verify_csrf_token(csrf_token, current_user.id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid CSRF token")
 
 async def get_optional_user(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)]
-) -> Optional[User]:
-    token = request.cookies.get("access_token")
-    if not token or not token.startswith("Bearer "):
+) -> User | None:
+    token = request.cookies.get(settings.AUTH_COOKIE_NAME)
+    if not token:
         return None
-    
-    token = token.replace("Bearer ", "")
-    
+
+    if token.startswith("Bearer "):
+        token = token.replace("Bearer ", "", 1)
+
     try:
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[ALGORITHM]
-        )
+        payload = decode_access_token(token)
         token_data = TokenPayload(**payload)
         user = await user_service.get_user_by_id(db, token_data.sub)
+        if not user or not user.is_active:
+            return None
         return user
-    except (JWTError, ValidationError, HTTPException):
+    except Exception:
         return None
 
 # Home page
 @router.get("/", response_class=HTMLResponse)
-async def home(request: Request, current_user: Annotated[Optional[User], Depends(get_optional_user)]):
+async def home(request: Request, current_user: Annotated[User | None, Depends(get_optional_user)]):
     context = await get_user_context(request, current_user)
     context["active_page"] = "home"
     return templates.TemplateResponse("index.html", context)
@@ -67,7 +91,7 @@ async def login_submit(
     password: str = Form(...)
 ):
     user = await user_service.get_user_by_email(db, email)
-    if not user or not user.is_active:
+    if not user or not user.is_active or not verify_password(password, user.hashed_password):
         context = await get_user_context(request)
         context["error"] = "Invalid email or password"
         return templates.TemplateResponse("auth/login.html", context, status_code=400)
@@ -76,7 +100,14 @@ async def login_submit(
     access_token = create_access_token(user.id, expires_delta=access_token_expires)
     
     response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-    response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
+    response.set_cookie(
+        key=settings.AUTH_COOKIE_NAME,
+        value=access_token,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
     return response
 
 @router.get("/register", response_class=HTMLResponse)
@@ -115,7 +146,22 @@ async def register_submit(
 @router.get("/logout")
 async def logout():
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
-    response.delete_cookie(key="access_token")
+    response.delete_cookie(key=settings.AUTH_COOKIE_NAME)
+    return response
+
+
+@router.post("/set-locale")
+async def set_locale(locale: str = Form(...), redirect_to: str = Form("/")):
+    selected = normalize_locale(locale)
+    response = RedirectResponse(url=redirect_to or "/", status_code=status.HTTP_303_SEE_OTHER)
+    response.set_cookie(
+        key="locale",
+        value=selected,
+        httponly=False,
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+        max_age=60 * 60 * 24 * 365,
+    )
     return response
 
 # Dashboard routes
@@ -188,9 +234,12 @@ async def create_resume_submit(
     request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    resume_text: Optional[str] = Form(None),
-    resume_file: Optional[UploadFile] = File(None)
+    resume_text: str | None = Form(None),
+    resume_file: UploadFile | None = File(None),
+    csrf_token: str = Form(...),
 ):
+    validate_csrf_or_400(current_user, csrf_token)
+
     if not resume_file and not resume_text:
         context = await get_user_context(request, current_user)
         context["error"] = "Either file or text must be provided"
@@ -242,6 +291,26 @@ async def resume_detail(
     
     return templates.TemplateResponse("resumes/detail.html", context)
 
+
+@router.post("/resumes/{id}/delete")
+async def delete_resume_submit(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    csrf_token: str = Form(...),
+):
+    validate_csrf_or_400(current_user, csrf_token)
+
+    resume = await resume_service.get_resume(db, id)
+    if not resume:
+        return RedirectResponse(url="/resumes", status_code=status.HTTP_303_SEE_OTHER)
+
+    if resume.user_id != current_user.id and not current_user.is_recruiter:
+        return RedirectResponse(url="/resumes", status_code=status.HTTP_303_SEE_OTHER)
+
+    await resume_service.delete_resume(db, id)
+    return RedirectResponse(url="/resumes", status_code=status.HTTP_303_SEE_OTHER)
+
 # Job routes
 @router.get("/jobs", response_class=HTMLResponse)
 async def jobs(
@@ -270,8 +339,11 @@ async def create_job_submit(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     title: str = Form(...),
-    description_text: str = Form(...)
+    description_text: str = Form(...),
+    csrf_token: str = Form(...),
 ):
+    validate_csrf_or_400(current_user, csrf_token)
+
     if not current_user.is_recruiter:
         return RedirectResponse(url="/jobs", status_code=status.HTTP_303_SEE_OTHER)
     
@@ -344,8 +416,11 @@ async def create_application(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     job_id: int = Form(...),
-    resume_id: int = Form(...)
+    resume_id: int = Form(...),
+    csrf_token: str = Form(...),
 ):
+    validate_csrf_or_400(current_user, csrf_token)
+
     if current_user.is_recruiter:
         return RedirectResponse(url="/jobs", status_code=status.HTTP_303_SEE_OTHER)
     
@@ -424,10 +499,13 @@ async def application_detail(
 @router.post("/applications/{id}/update-status")
 async def update_application_status(
     id: int,
-    status: str = Form(...),
+    status_value: str = Form(..., alias="status"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    csrf_token: str = Form(...),
 ):
+    validate_csrf_or_400(current_user, csrf_token)
+
     if not current_user.is_recruiter:
         return RedirectResponse(url="/applications", status_code=status.HTTP_303_SEE_OTHER)
     
@@ -441,10 +519,10 @@ async def update_application_status(
         return RedirectResponse(url="/applications", status_code=status.HTTP_303_SEE_OTHER)
     
     valid_statuses = ["New", "Reviewed", "Shortlisted", "Rejected"]
-    if status not in valid_statuses:
+    if status_value not in valid_statuses:
         return RedirectResponse(url=f"/applications/{id}", status_code=status.HTTP_303_SEE_OTHER)
     
-    await matching_service.update_application_status(db, id, status)
+    await matching_service.update_application_status(db, id, status_value)
     return RedirectResponse(url=f"/applications/{id}", status_code=status.HTTP_303_SEE_OTHER)
 
 # Analysis routes

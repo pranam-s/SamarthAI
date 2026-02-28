@@ -1,77 +1,57 @@
 import asyncio
-import base64
 import json
 import os
+import re
 import uuid
-from typing import Dict, List, Optional, Any, Tuple, BinaryIO, Set
-import io
-from pydantic import BaseModel
-import httpx
-import numpy as np
-from fastapi import UploadFile, HTTPException, status
-from sqlalchemy import select, update, delete
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select as future_select
+from collections import Counter
+from datetime import datetime, timezone
+from typing import Any
+
 import aiofiles
-import PyPDF2
 from docx import Document
+from fastapi import UploadFile
 from google import genai
 from google.genai import types
+from openai import OpenAI
+from pypdf import PdfReader
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
-from schemas import Resume, Job, JobBase, ResumeBase, MatchDetails
-from models import Resume as ResumeModel
-from models import Job as JobModel
 from models import Application as ApplicationModel
+from models import Job as JobModel
+from models import Resume as ResumeModel
 from models import User as UserModel
 
 
 class AIService:
     def __init__(self):
-        self.model = settings.GEMINI_MODEL
-        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        self.google_client = None
+        self.openrouter_client = None
 
-    async def call_gemini(self, prompt: str, file_path: str = None) -> dict:
-        try:
-            contents = [prompt]
+        if settings.resolved_google_api_key:
+            self.google_client = genai.Client(api_key=settings.resolved_google_api_key)
 
-            if file_path:
-                mime_type = self._get_mime_type(file_path)
-                async with aiofiles.open(file_path, 'rb') as f:
-                    file_data = await f.read()
-                contents.append(types.Part.from_bytes(data=file_data, mime_type=mime_type))
-
-            config = types.GenerateContentConfig()
-            response = await self.client.aio.models.generate_content(
-                model=self.model,
-                contents=contents,
-                config=config
+        if settings.OPENROUTER_API_KEY:
+            self.openrouter_client = OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=settings.OPENROUTER_API_KEY,
             )
 
-            if response.text:
-                try:
-                    return self.parse_json(response.text)
-                except :
-                    return response.text
-            else:
-                return {"error": "No text response from the model."}
-
-        except Exception as e:
-            return {"error": f"Gemini API call failed: {str(e)}"}
-
-    def parse_json(self, text):
-        start_idx = text.find('{')
+    @staticmethod
+    def parse_json(text: str) -> dict[str, Any]:
+        start_idx = text.find("{")
         if start_idx == -1:
-            raise ValueError("No JSON object found in the input string")
+            raise ValueError("No JSON object found in response")
+
         stack = []
         in_string = False
         escaped = False
-        
+
         for i in range(start_idx, len(text)):
             char = text[i]
-            
             if in_string:
-                if char == '\\' and not escaped:
+                if char == "\\" and not escaped:
                     escaped = True
                 elif char == '"' and not escaped:
                     in_string = False
@@ -80,411 +60,351 @@ class AIService:
             else:
                 if char == '"':
                     in_string = True
-                elif char == '{':
-                    stack.append('{')
-                elif char == '}':
+                elif char == "{":
+                    stack.append(char)
+                elif char == "}":
                     if not stack:
-                        raise ValueError("Unbalanced braces in the input string")
+                        raise ValueError("Malformed JSON response")
                     stack.pop()
-                
                     if not stack:
-                        end_idx = i + 1
-                        json_str = text[start_idx:end_idx]
-                        try:
-                            return json.loads(json_str)
-                        except json.JSONDecodeError as e:
-                            raise ValueError(f"Failed to parse JSON: {e}")
-        raise ValueError("Unbalanced braces in the input string")
+                        json_candidate = text[start_idx:i + 1]
+                        return json.loads(json_candidate)
 
-    def _get_mime_type(self, file_path: str) -> str:
-        file_extension = os.path.splitext(file_path)[1].lower()
-        if file_extension == '.pdf':
-            return 'application/pdf'
-        elif file_extension in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']:
-            return f'image/{file_extension[1:]}'
-        elif file_extension == '.txt':
-            return 'text/plain'
-        else:
-            return 'application/octet-stream'
+        raise ValueError("Malformed JSON response")
+
+    async def _call_google(self, prompt: str, file_path: str | None = None) -> str | None:
+        if not self.google_client:
+            return None
+
+        try:
+            contents: list[Any] = [prompt]
+            if file_path:
+                mime_type = self._get_mime_type(file_path)
+                async with aiofiles.open(file_path, "rb") as uploaded_file:
+                    file_bytes = await uploaded_file.read()
+                contents.append(types.Part.from_bytes(data=file_bytes, mime_type=mime_type))
+
+            response = await self.google_client.aio.models.generate_content(
+                model=settings.GOOGLE_MODEL,
+                contents=contents,
+                config=types.GenerateContentConfig(),
+            )
+            return response.text
+        except Exception:
+            return None
+
+    async def _call_openrouter(self, prompt: str) -> str | None:
+        if not self.openrouter_client:
+            return None
+
+        def _invoke() -> str | None:
+            completion = self.openrouter_client.chat.completions.create(
+                model=settings.OPENROUTER_MODEL,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ],
+                extra_headers={
+                    "HTTP-Referer": settings.APP_URL,
+                    "X-OpenRouter-Title": settings.PROJECT_NAME,
+                },
+            )
+            return completion.choices[0].message.content
+
+        try:
+            return await asyncio.to_thread(_invoke)
+        except Exception:
+            return None
+
+    async def _call_text(self, prompt: str, file_path: str | None = None) -> str | None:
+        providers = [settings.AI_PRIMARY_PROVIDER, settings.AI_FALLBACK_PROVIDER]
+        for provider in providers:
+            if provider == "google":
+                text = await self._call_google(prompt, file_path=file_path)
+            elif provider == "openrouter":
+                text = await self._call_openrouter(prompt)
+            else:
+                text = None
+
+            if text:
+                return text
+
+        return None
+
+    async def call_gemini(self, prompt: str, file_path: str | None = None) -> dict[str, Any] | str:
+        text = await self._call_text(prompt, file_path=file_path)
+        if not text:
+            return {"error": "No provider response available"}
+
+        try:
+            return self.parse_json(text)
+        except Exception:
+            return text
+
+    @staticmethod
+    def _get_mime_type(file_path: str) -> str:
+        extension = os.path.splitext(file_path)[1].lower()
+        if extension == ".pdf":
+            return "application/pdf"
+        if extension in [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"]:
+            return f"image/{extension[1:]}"
+        if extension == ".txt":
+            return "text/plain"
+        return "application/octet-stream"
 
     async def extract_resume_from_pdf(self, file_path: str) -> str:
-        prompt = f"""
-    Extract all text from this PDF resume, preserving its structure as much as possible.
-    Return only the extracted text, with no additional formatting or analysis.
-    """
+        prompt = (
+            "Extract all text from this resume file while preserving section structure. "
+            "Return only plain text."
+        )
+        response = await self._call_text(prompt, file_path=file_path)
+        if response:
+            return response
+        return await self._extract_text_from_pdf_locally(file_path)
 
-        response = await self.call_gemini(prompt, file_path=file_path)
-        return response
+    async def _extract_text_from_pdf_locally(self, file_path: str) -> str:
+        text_chunks: list[str] = []
+        with open(file_path, "rb") as file_obj:
+            reader = PdfReader(file_obj)
+            for page in reader.pages:
+                text_chunks.append(page.extract_text() or "")
+        return "\n".join(text_chunks).strip()
 
-    async def parse_resume(self, text: str) -> Dict[str, Any]:
-        prompt = f"""
-        Extract the following information from this resume in JSON format:
-        
-        Resume:
-        {text}
-        
-        Return only a valid JSON object with the following structure:
-        {{
-            "parsed_sections": {{
-                "summary": "string",  // Brief professional summary
-                "contact": {{
-                    "name": "string",
-                    "email": "string",
-                    "phone": "string",
-                    "location": "string"
-                }}
-            }},
-            "skills": [
-                {{
-                    "name": "string",  // Skill name
-                    "proficiency": "string",  // Expert, Intermediate, Beginner
-                    "context": "string"  // Where/how this skill was used
-                }}
-            ],
-            "experience": [
-                {{
-                    "role": "string",  // Job title
-                    "company": "string",  // Company name
-                    "start_date": "string",  // Start date (YYYY-MM format)
-                    "end_date": "string",  // End date or "Present"
-                    "description": "string",  // Job description
-                    "achievements": [  // List of accomplishments
-                        "string"
-                    ]
-                }}
-            ],
-            "education": [
-                {{
-                    "institution": "string",  // School/university name
-                    "degree": "string",  // Degree type (e.g., Bachelor of Science)
-                    "field_of_study": "string",  // Major
-                    "start_date": "string",  // Start date (YYYY-MM format)
-                    "end_date": "string",  // End date (YYYY-MM format)
-                    "gpa": "string"  // GPA if mentioned
-                }}
-            ],
-            "projects": [
-                {{
-                    "name": "string",  // Project title
-                    "description": "string",  // Brief description
-                    "technologies": [  // Technologies used
-                        "string"
-                    ],
-                    "url": "string"  // Project link if available
-                }}
-            ],
-            "certifications": [
-                {{
-                    "name": "string",  // Certification name
-                    "issuer": "string",  // Issuing organization
-                    "date": "string",  // Date obtained
-                    "expires": "string"  // Expiration date if applicable
-                }}
-            ],
-            "achievements": [
-                {{
-                    "description": "string"  // Achievement description
-                }}
-            ]
-        }}
-        
-        If a field isn't present in the resume, use empty strings for required text fields, empty arrays for lists, and null for optional fields.
-        """
-        
-        response = await self.call_gemini(prompt)
-        print(response)
-        """if isinstance(response, str):
+    @staticmethod
+    def _default_resume_payload(text: str) -> dict[str, Any]:
+        email_match = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", text)
+        phone_match = re.search(r"(?:\+?\d{1,3}[\s-]?)?(?:\d[\s-]?){8,13}", text)
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        possible_name = lines[0] if lines else ""
+
+        skill_keywords = [
+            "python", "java", "javascript", "typescript", "react", "node", "sql", "docker",
+            "kubernetes", "aws", "gcp", "azure", "fastapi", "django", "flask", "git",
+            "linux", "pandas", "numpy", "machine learning", "llm", "genai", "tensorflow",
+            "pytorch", "postgresql", "mongodb",
+        ]
+        lowered = text.lower()
+        found_skills = []
+        for skill in skill_keywords:
+            if skill in lowered:
+                found_skills.append({"name": skill.title(), "proficiency": "", "context": ""})
+
+        return {
+            "parsed_sections": {
+                "summary": lines[1] if len(lines) > 1 else "",
+                "contact": {
+                    "name": possible_name,
+                    "email": email_match.group(0) if email_match else "",
+                    "phone": phone_match.group(0) if phone_match else "",
+                    "location": "",
+                },
+            },
+            "skills": found_skills,
+            "experience": [],
+            "education": [],
+            "projects": [],
+            "certifications": [],
+            "achievements": [],
+        }
+
+    async def parse_resume(self, text: str) -> dict[str, Any]:
+        prompt = (
+            "Extract resume information into JSON with fields parsed_sections, skills, experience, "
+            "education, projects, certifications, achievements. Return JSON only. "
+            f"Resume:\n{text}"
+        )
+        response = await self._call_text(prompt)
+        if response:
             try:
-                return json.loads(response)
-            except:
-                return {
-                    "parsed_sections": {},
-                    "skills": [],
-                    "experience": [],
-                    "education": [],
-                    "projects": [],
-                    "certifications": [],
-                    "achievements": []
-                }"""
-        return response
+                parsed = self.parse_json(response)
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
+                pass
+        return self._default_resume_payload(text)
 
-    async def parse_job_description(self, text: str) -> Dict[str, Any]:
-        prompt = f"""
-        Extract the following information from this job description in JSON format:
-        
-        Job Description:
-        {text}
-        
-        Return only a valid JSON object with the following structure:
-        {{
-            "title": "string",  // Job title
-            "required_skills": [
-                {{
-                    "name": "string",  // Skill name
-                    "importance": float  // Value between 0-1, default to 1.0 if not specified
-                }}
-            ],
-            "preferred_skills": [
-                {{
-                    "name": "string",  // Skill name
-                    "importance": float  // Value between 0-1, default to 0.5 if not specified
-                }}
-            ],
-            "responsibilities": [  // List of job responsibilities
-                "string"
-            ],
-            "qualifications": [  // List of job qualifications/requirements
-                "string"
-            ]
-        }}
-        
-        For importance values: assign 1.0 for critical skills, 0.8 for very important skills, 0.6 for important skills. For preferred skills, use 0.5 for nice-to-have skills, and 0.3 for bonus skills.
-        
-        If a field isn't present, return an empty array. All specified fields must be present in the response.
-        """
-        
-        response = await self.call_gemini(prompt)
-        if isinstance(response, str):
+    @staticmethod
+    def _default_job_payload(text: str) -> dict[str, Any]:
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        title = lines[0] if lines else "Untitled Job"
+
+        keyword_weights = {
+            "python": 1.0,
+            "fastapi": 1.0,
+            "sql": 1.0,
+            "docker": 0.8,
+            "kubernetes": 0.8,
+            "aws": 0.8,
+            "react": 0.7,
+            "typescript": 0.7,
+            "machine learning": 0.8,
+            "genai": 0.7,
+        }
+
+        lowered = text.lower()
+        required_skills: list[dict[str, Any]] = []
+        for keyword, importance in keyword_weights.items():
+            if keyword in lowered:
+                required_skills.append({"name": keyword.title(), "importance": importance})
+
+        return {
+            "title": title,
+            "required_skills": required_skills,
+            "preferred_skills": [],
+            "responsibilities": [],
+            "qualifications": [],
+        }
+
+    async def parse_job_description(self, text: str) -> dict[str, Any]:
+        prompt = (
+            "Extract job fields into JSON with title, required_skills, preferred_skills, responsibilities, "
+            "qualifications. Return JSON only. "
+            f"Job:\n{text}"
+        )
+        response = await self._call_text(prompt)
+        if response:
             try:
-                return json.loads(response)
-            except:
-                return {
-                    "title": "Untitled Job",
-                    "required_skills": [],
-                    "preferred_skills": [],
-                    "responsibilities": [],
-                    "qualifications": []
-                }
-        return response
+                parsed = self.parse_json(response)
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
+                pass
+        return self._default_job_payload(text)
+
+    @staticmethod
+    def _extract_skill_names(skills: Any) -> list[str]:
+        if not isinstance(skills, list):
+            return []
+        values: list[str] = []
+        for skill in skills:
+            if isinstance(skill, dict) and skill.get("name"):
+                values.append(str(skill["name"]).strip().lower())
+            elif isinstance(skill, str):
+                values.append(skill.strip().lower())
+        return values
+
+    def _heuristic_match_score(self, resume_data: dict[str, Any], job_data: dict[str, Any]) -> tuple[float, dict[str, Any]]:
+        resume_skills = set(self._extract_skill_names(resume_data.get("skills", [])))
+        required_skills = set(self._extract_skill_names(job_data.get("required_skills", [])))
+        preferred_skills = set(self._extract_skill_names(job_data.get("preferred_skills", [])))
+
+        matched_required = sorted(required_skills.intersection(resume_skills))
+        missing_required = sorted(required_skills.difference(resume_skills))
+        matched_preferred = sorted(preferred_skills.intersection(resume_skills))
+        missing_preferred = sorted(preferred_skills.difference(resume_skills))
+
+        required_rate = (len(matched_required) / len(required_skills) * 100.0) if required_skills else 100.0
+        preferred_rate = (len(matched_preferred) / len(preferred_skills) * 100.0) if preferred_skills else 100.0
+        skills_score = round((required_rate * 0.8) + (preferred_rate * 0.2), 2)
+
+        experience_entries = resume_data.get("experience", []) if isinstance(resume_data.get("experience"), list) else []
+        education_entries = resume_data.get("education", []) if isinstance(resume_data.get("education"), list) else []
+
+        experience_score = 70.0 if experience_entries else 25.0
+        education_score = 75.0 if education_entries else 30.0
+
+        overall_match = round((skills_score * 0.6) + (experience_score * 0.3) + (education_score * 0.1), 2)
+
+        details = {
+            "overall_match": overall_match,
+            "sections": {
+                "skills": {
+                    "score": round(skills_score, 2),
+                    "required": {
+                        "matched": [item.title() for item in matched_required],
+                        "missing": [item.title() for item in missing_required],
+                        "match_rate": round(required_rate, 2),
+                    },
+                    "preferred": {
+                        "matched": [item.title() for item in matched_preferred],
+                        "missing": [item.title() for item in missing_preferred],
+                        "match_rate": round(preferred_rate, 2),
+                    },
+                },
+                "experience": {
+                    "score": round(experience_score, 2),
+                    "matching_aspects": ["Relevant experience available"] if experience_entries else [],
+                    "missing_aspects": [] if experience_entries else ["Add role-specific experience"],
+                    "experience_entries": [],
+                },
+                "education": {
+                    "score": round(education_score, 2),
+                    "matching_aspects": ["Education data available"] if education_entries else [],
+                    "missing_aspects": [] if education_entries else ["Add education details"],
+                    "highest_education": None,
+                },
+            },
+            "weights_applied": {
+                "skills": 0.6,
+                "experience": 0.3,
+                "education": 0.1,
+            },
+        }
+        return overall_match, details
 
     async def calculate_match_score(
-        self, 
-        resume_data: Dict[str, Any], 
-        job_data: Dict[str, Any],
-    ) -> Tuple[float, Dict[str, Any]]:
-        prompt=f"""
-        Analyze how well this resume matches the job description.
-
-        Resume:
-        {json.dumps(resume_data)}
-
-        Job Description:
-        {json.dumps(job_data)}
-
-        Return ONLY a JSON object with this exact structure, the values given are only for demonstration:
-        {{
-          "overall_match": 75.5,
-          "sections": {{
-            "skills": {{
-              "score": 80.0,
-              "required": {{
-                "matched": ["Python", "SQL"],
-                "missing": ["Kubernetes"],
-                "match_rate": 66.7
-              }},
-              "preferred": {{
-                "matched": ["Docker"],
-                "missing": ["AWS", "GraphQL"],
-                "match_rate": 33.3
-              }}
-            }},
-            "experience": {{
-              "score": 70.0,
-              "matching_aspects": ["Backend development", "Team leadership"],
-              "missing_aspects": ["Enterprise architecture", "CI/CD pipelines"],
-              "experience_entries": [
-                {{
-                  "role": "Software Engineer",
-                  "company": "Tech Corp",
-                  "match_percentage": 75.0,
-                  "matching_terms": ["Python", "development", "leadership"]
-                }}
-              ]
-            }},
-            "education": {{
-              "score": 85.0,
-              "matching_aspects": ["Bachelor's degree in Computer Science"],
-              "missing_aspects": [],
-              "highest_education": "bachelor"
-            }}
-          }},
-          "weights_applied": {{
-            "skills": 0.6,
-            "experience": 0.3,
-            "education": 0.1
-          }}
-        }}
-
-        Ensure all fields are present with default values if needed (empty arrays, 0.0 for numbers). 
-        For highest_education, use one of: "high school", "associate", "bachelor", "master", "phd", or null if unknown.
-        Calculate overall_match as the weighted average of section scores.
-        """
-        
-        response = await self.call_gemini(prompt)
-        
-        if isinstance(response, str):
+        self,
+        resume_data: dict[str, Any],
+        job_data: dict[str, Any],
+    ) -> tuple[float, dict[str, Any]]:
+        prompt = (
+            "Analyze job-resume fit and return JSON with overall_match, sections.skills/experience/education, "
+            "and weights_applied. Return JSON only. "
+            f"Resume: {json.dumps(resume_data)}\nJob: {json.dumps(job_data)}"
+        )
+        response = await self._call_text(prompt)
+        if response:
             try:
-                response = json.loads(response)
-            except:
-                response = {
-                    "overall_match": 0.0,
-                    "sections": {
-                        "skills": {
-                            "score": 0.0,
-                            "required": {
-                                "matched": [],
-                                "missing": [],
-                                "match_rate": 0.0
-                            },
-                            "preferred": {
-                                "matched": [],
-                                "missing": [],
-                                "match_rate": 0.0
-                            }
-                        },
-                        "experience": {
-                            "score": 0.0,
-                            "matching_aspects": [],
-                            "missing_aspects": [],
-                            "experience_entries": []
-                        },
-                        "education": {
-                            "score": 0.0,
-                            "matching_aspects": [],
-                            "missing_aspects": [],
-                            "highest_education": None
-                        }
-                    },
-                    "weights_applied": {
-                        "skills": 0.6,
-                        "experience": 0.3,
-                        "education": 0.1
-                    }
-                }
-        
-        if not isinstance(response, dict):
-            response = {}
-        
-        overall_match = response.get("overall_match", 0.0)
-        
-        return overall_match, response
+                parsed = self.parse_json(response)
+                if isinstance(parsed, dict):
+                    return float(parsed.get("overall_match", 0.0)), parsed
+            except Exception:
+                pass
+        return self._heuristic_match_score(resume_data, job_data)
 
     async def generate_resume_feedback(
-        self, 
-        resume_data: Dict[str, Any], 
-        job_data: Dict[str, Any],
-        match_details: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self,
+        resume_data: dict[str, Any],
+        job_data: dict[str, Any],
+        match_details: dict[str, Any],
+    ) -> dict[str, Any]:
         missing_required_skills = []
         missing_preferred_skills = []
-        missing_responsibilities = []
-        education_gaps = []
-        
-        try:
-            if "sections" in match_details:
-                if "skills" in match_details["sections"]:
-                    if "required" in match_details["sections"]["skills"]:
-                        missing_required_skills = match_details["sections"]["skills"]["required"].get("missing", [])
-                    if "preferred" in match_details["sections"]["skills"]:
-                        missing_preferred_skills = match_details["sections"]["skills"]["preferred"].get("missing", [])
-                if "experience" in match_details["sections"]:
-                    missing_responsibilities = match_details["sections"]["experience"].get("missing_aspects", [])
-                if "education" in match_details["sections"]:
-                    education_gaps = match_details["sections"]["education"].get("missing_aspects", [])
-        except Exception as e:
-            print(f"Error extracting from match details: {str(e)}")
-        
+
+        skills_section = match_details.get("sections", {}).get("skills", {})
+        required_section = skills_section.get("required", {})
+        preferred_section = skills_section.get("preferred", {})
+
+        missing_required_skills = required_section.get("missing", [])
+        missing_preferred_skills = preferred_section.get("missing", [])
+
         strengths = []
-        improvements = []
-        keywords = []
-        
-        try:
-            if "sections" in match_details:
-                if "skills" in match_details["sections"]:
-                    if "required" in match_details["sections"]["skills"]:
-                        for skill in match_details["sections"]["skills"]["required"].get("matched", []):
-                            strengths.append(f"You have the required skill: {skill}")
-                    if "preferred" in match_details["sections"]["skills"]:
-                        for skill in match_details["sections"]["skills"]["preferred"].get("matched", []):
-                            strengths.append(f"You have the preferred skill: {skill}")
-                if "experience" in match_details["sections"]:
-                    if match_details["sections"]["experience"].get("score", 0) > 50:
-                        strengths.append("Your experience aligns well with job responsibilities")
-                if "education" in match_details["sections"]:
-                    if match_details["sections"]["education"].get("score", 0) > 50:
-                        strengths.append("Your educational background matches the job requirements")
-        except Exception as e:
-            print(f"Error building strengths from match details: {str(e)}")
-        
-        for skill in missing_required_skills:
-            improvements.append(f"Add the required skill: {skill}")
-            keywords.append(skill)
-        
-        for skill in missing_preferred_skills[:3]: 
-            improvements.append(f"Consider adding the preferred skill: {skill}")
-            keywords.append(skill)
-        
-        for resp in missing_responsibilities[:3]: 
-            improvements.append(f"Highlight experience related to: {resp}")
-            for word in resp.split():
-                if len(word) > 4:
-                    keywords.append(word)
-        
-        for qual in education_gaps[:2]: 
-            improvements.append(f"Address this qualification: {qual}")
-        
-        prompt = f"""
-        Based on the job match analysis below, provide constructive feedback to improve the resume:
-        
-        Match Score: {match_details.get('overall_match', 0):.1f}%
-        
-        Initial Strengths:
-        {json.dumps(strengths)}
-        
-        Initial Improvement Areas:
-        {json.dumps(improvements)}
-        
-        Missing Skills:
-        {json.dumps(missing_required_skills + missing_preferred_skills[:3])}
-        
-        Important Keywords:
-        {json.dumps(list(set(keywords)))}
-        
-        Please provide personalized feedback in JSON format with these fields:
-        {{
-            "strengths": [
-                "String describing a specific strength"
-            ],
-            "improvements": [
-                "String describing a specific, actionable improvement"
-            ],
-            "missing_skills": [
-                "Name of missing skill"
-            ],
-            "keyword_recommendations": [
-                "Keyword to add to resume"
-            ]
-        }}
-        
-        Provide 3-5 items in each list. Be specific and actionable in your recommendations.
-        """
-        
-        response = await self.call_gemini(prompt)
-        
-        if isinstance(response, str):
+        for skill in required_section.get("matched", []):
+            strengths.append(f"You match required skill: {skill}")
+
+        improvements = [f"Add evidence for skill: {skill}" for skill in missing_required_skills[:5]]
+        keyword_recommendations = list(dict.fromkeys([*missing_required_skills, *missing_preferred_skills]))[:10]
+
+        prompt = (
+            "Provide concise JSON feedback with strengths, improvements, missing_skills, keyword_recommendations. "
+            f"Match details: {json.dumps(match_details)}"
+        )
+        response = await self._call_text(prompt)
+        if response:
             try:
-                response_json = json.loads(response)
-                return response_json
-            except json.JSONDecodeError:
+                parsed = self.parse_json(response)
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
                 pass
-        elif isinstance(response, dict) and not response.get("error"):
-            return response
-        
+
         return {
-            "strengths": strengths[:5],
-            "improvements": improvements[:5],
-            "missing_skills": missing_required_skills + missing_preferred_skills[:3],
-            "keyword_recommendations": list(set(keywords))[:10]
+            "strengths": strengths[:5] if strengths else ["Resume contains useful baseline information."],
+            "improvements": improvements if improvements else ["Add measurable impact in project or role descriptions."],
+            "missing_skills": missing_required_skills[:8],
+            "keyword_recommendations": keyword_recommendations,
         }
 
 
@@ -493,8 +413,9 @@ class ResumeService:
         os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
         self.ai_service = ai_service
         
-    async def process_resume_file(self, file: UploadFile) -> Dict[str, Any]:
-        file_extension = os.path.splitext(file.filename)[1]
+    async def process_resume_file(self, file: UploadFile) -> dict[str, Any]:
+        filename = file.filename or "resume.txt"
+        file_extension = os.path.splitext(filename)[1]
         unique_filename = f"{uuid.uuid4()}{file_extension}"
         file_path = os.path.join(settings.UPLOAD_DIR, unique_filename)
         
@@ -503,13 +424,13 @@ class ResumeService:
                 await out_file.write(content)
         
         if file_extension.lower() == '.pdf':
-            text=await self.ai_service.extract_resume_from_pdf(file_path)
+            text = await self.ai_service.extract_resume_from_pdf(file_path)
             structured_text = text
         elif file_extension.lower() == '.docx':
             text = await self._extract_text_from_docx(file_path)
             structured_text = text
         else:
-            async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+            async with aiofiles.open(file_path, encoding='utf-8') as f:
                 text = await f.read()
             structured_text = text
         
@@ -523,7 +444,7 @@ class ResumeService:
             "parsed_data": parsed_data,
         }
     
-    async def process_resume_text(self, text: str) -> Dict[str, Any]:
+    async def process_resume_text(self, text: str) -> dict[str, Any]:
         parsed_data = await self.ai_service.parse_resume(text)
         
         return {
@@ -537,7 +458,7 @@ class ResumeService:
     async def _extract_text_from_pdf(self, file_path: str) -> str:
         text = ""
         with open(file_path, 'rb') as file:
-            pdf_reader = PyPDF2.PdfReader(file)
+            pdf_reader = PdfReader(file)
             for page in pdf_reader.pages:
                 text += page.extract_text() + "\n"
         return text
@@ -549,7 +470,7 @@ class ResumeService:
             full_text.append(para.text)
         return '\n'.join(full_text)
 
-    async def create_resume(self, db: AsyncSession, user_id: int, resume_data: Dict[str, Any]) -> ResumeModel:
+    async def create_resume(self, db: AsyncSession, user_id: int, resume_data: dict[str, Any]) -> ResumeModel:
         resume = ResumeModel(
             user_id=user_id,
             full_text=resume_data["full_text"],
@@ -569,15 +490,15 @@ class ResumeService:
         await db.refresh(resume)
         return resume
     
-    async def get_resumes(self, db: AsyncSession, user_id: int, is_recruiter: bool, skip: int = 0, limit: int = 100) -> List[ResumeModel]:
+    async def get_resumes(self, db: AsyncSession, user_id: int, is_recruiter: bool, skip: int = 0, limit: int = 100) -> list[ResumeModel]:
         if is_recruiter:
             result = await db.execute(select(ResumeModel).offset(skip).limit(limit))
         else:
             result = await db.execute(select(ResumeModel).where(ResumeModel.user_id == user_id).offset(skip).limit(limit))
         
-        return result.scalars().all()
+        return list(result.scalars().all())
     
-    async def get_resume(self, db: AsyncSession, resume_id: int) -> Optional[ResumeModel]:
+    async def get_resume(self, db: AsyncSession, resume_id: int) -> ResumeModel | None:
         result = await db.execute(select(ResumeModel).where(ResumeModel.id == resume_id))
         return result.scalars().first()
     
@@ -597,7 +518,7 @@ class JobService:
     def __init__(self, ai_service: AIService):
         self.ai_service = ai_service
         
-    async def process_job_description(self, text: str) -> Dict[str, Any]:
+    async def process_job_description(self, text: str) -> dict[str, Any]:
         parsed_data = await self.ai_service.parse_job_description(text)
         
         return {
@@ -605,7 +526,7 @@ class JobService:
             "parsed_data": parsed_data,
         }
     
-    async def create_job(self, db: AsyncSession, user_id: int, job_data: Dict[str, Any], job_in: Dict[str, Any]) -> JobModel:
+    async def create_job(self, db: AsyncSession, user_id: int, job_data: dict[str, Any], job_in: dict[str, Any]) -> JobModel:
         job = JobModel(
             company_id=user_id,
             title=job_in.get("title") or job_data["parsed_data"].get("title", "Untitled Job"),
@@ -622,19 +543,19 @@ class JobService:
         await db.refresh(job)
         return job
     
-    async def get_jobs(self, db: AsyncSession, user_id: int, is_recruiter: bool, skip: int = 0, limit: int = 100) -> List[JobModel]:
+    async def get_jobs(self, db: AsyncSession, user_id: int, is_recruiter: bool, skip: int = 0, limit: int = 100) -> list[JobModel]:
         if is_recruiter:
             result = await db.execute(select(JobModel).where(JobModel.company_id == user_id).offset(skip).limit(limit))
         else:
             result = await db.execute(select(JobModel).offset(skip).limit(limit))
         
-        return result.scalars().all()
+        return list(result.scalars().all())
     
-    async def get_job(self, db: AsyncSession, job_id: int) -> Optional[JobModel]:
+    async def get_job(self, db: AsyncSession, job_id: int) -> JobModel | None:
         result = await db.execute(select(JobModel).where(JobModel.id == job_id))
         return result.scalars().first()
     
-    async def update_job(self, db: AsyncSession, job_id: int, job_data: Dict[str, Any]) -> Optional[JobModel]:
+    async def update_job(self, db: AsyncSession, job_id: int, job_data: dict[str, Any]) -> JobModel | None:
         job = await self.get_job(db, job_id)
         if job:
             for key, value in job_data.items():
@@ -653,6 +574,107 @@ class JobService:
             return True
         return False
 
+    async def get_recommendations(self, resume_id: int, db: AsyncSession, current_user: UserModel, limit: int = 5) -> list[JobModel]:
+        resume = await resume_service.get_resume(db, resume_id)
+        if not resume:
+            return []
+
+        jobs = await self.get_jobs(db, current_user.id, current_user.is_recruiter, limit=100)
+        job_scores: list[tuple[JobModel, float]] = []
+
+        for job in jobs:
+            score, _ = await self.ai_service.calculate_match_score(
+                resume.parsed_sections,
+                {
+                    "title": job.title,
+                    "required_skills": job.required_skills,
+                    "preferred_skills": job.preferred_skills,
+                    "responsibilities": job.responsibilities,
+                    "qualifications": job.qualifications,
+                },
+            )
+            job_scores.append((job, score))
+
+        job_scores.sort(key=lambda item: item[1], reverse=True)
+        return [job for job, _ in job_scores[:limit]]
+
+    async def get_resume_improvement(self, resume_id: int, db: AsyncSession, current_user: UserModel) -> dict[str, Any]:
+        resume = await resume_service.get_resume(db, resume_id)
+        if not resume:
+            return {}
+
+        prompt = (
+            "Analyze this resume and provide JSON with format, bullet_points, keywords, skills arrays. "
+            f"Resume: {resume.full_text}"
+        )
+        response = await self.ai_service.call_gemini(prompt)
+        if isinstance(response, dict) and "error" not in response:
+            return response
+
+        return {
+            "format": ["Use consistent section headings and spacing."],
+            "bullet_points": ["Begin bullets with impact verbs and include quantifiable outcomes."],
+            "keywords": ["Collaboration", "Problem Solving", "Delivery"],
+            "skills": [skill.get("name") for skill in (resume.skills or [])[:5] if isinstance(skill, dict)],
+        }
+
+    async def get_resume_quality_score(self, resume_id: int, db: AsyncSession, current_user: UserModel) -> dict[str, Any]:
+        resume = await resume_service.get_resume(db, resume_id)
+        if not resume:
+            return {}
+
+        has_quantifiable = False
+        experience_score = 0
+        for exp in resume.experience or []:
+            achievements = exp.get("achievements", []) if isinstance(exp, dict) else []
+            for achievement in achievements:
+                if re.search(r"\d+%|\d+x|\$\d+|increased|decreased|improved|reduced|saved|generated", str(achievement), re.IGNORECASE):
+                    has_quantifiable = True
+                    experience_score += 10
+
+        skills_score = min(100, len(resume.skills or []) * 7)
+        education_score = min(100, len(resume.education or []) * 30)
+        overall = round((min(100, experience_score) * 0.5) + (skills_score * 0.3) + (education_score * 0.2), 2)
+
+        suggestions = []
+        if not has_quantifiable:
+            suggestions.append("Add measurable outcomes in experience bullets.")
+        if skills_score < 60:
+            suggestions.append("Expand skills with proficiency and role context.")
+        if education_score < 60:
+            suggestions.append("Add education details such as field and achievements.")
+
+        return {
+            "overall_score": overall,
+            "sections": {
+                "experience": min(100, experience_score),
+                "skills": skills_score,
+                "education": education_score,
+            },
+            "suggestions": suggestions,
+        }
+
+    async def get_market_analysis(self, db: AsyncSession, current_user: UserModel) -> dict[str, Any]:
+        jobs = await self.get_jobs(db, current_user.id, current_user.is_recruiter, limit=1000)
+
+        required_skills_counter: Counter[str] = Counter()
+        preferred_skills_counter: Counter[str] = Counter()
+
+        for job in jobs:
+            for skill in job.required_skills or []:
+                if isinstance(skill, dict) and skill.get("name"):
+                    required_skills_counter[str(skill["name"]).lower()] += 1
+            for skill in job.preferred_skills or []:
+                if isinstance(skill, dict) and skill.get("name"):
+                    preferred_skills_counter[str(skill["name"]).lower()] += 1
+
+        return {
+            "total_jobs_analyzed": len(jobs),
+            "top_required_skills": [{"name": name, "count": count} for name, count in required_skills_counter.most_common(10)],
+            "top_preferred_skills": [{"name": name, "count": count} for name, count in preferred_skills_counter.most_common(10)],
+            "analysis_date": datetime.now(timezone.utc).isoformat(),
+        }
+
 
 class MatchingService:
     def __init__(self, ai_service: AIService):
@@ -660,9 +682,9 @@ class MatchingService:
         
     async def match_resume_to_job(
         self, 
-        resume_data: Dict[str, Any], 
-        job_data: Dict[str, Any],
-    ) -> Tuple[float, Dict[str, Any], Dict[str, Any]]:
+        resume_data: dict[str, Any], 
+        job_data: dict[str, Any],
+    ) -> tuple[float, dict[str, Any], dict[str, Any]]:
         score, match_details = await self.ai_service.calculate_match_score(
             resume_data, 
             job_data,
@@ -675,10 +697,10 @@ class MatchingService:
     async def create_application(
         self, 
         db: AsyncSession, 
-        application_data: Dict[str, Any], 
+        application_data: dict[str, Any], 
         match_score: float,
-        match_details: Dict[str, Any],
-        feedback: Dict[str, Any]
+        match_details: dict[str, Any],
+        feedback: dict[str, Any]
     ) -> ApplicationModel:
         application = ApplicationModel(
             job_id=application_data["job_id"],
@@ -702,11 +724,11 @@ class MatchingService:
         db: AsyncSession, 
         user_id: int, 
         is_recruiter: bool,
-        job_id: Optional[int] = None,
-        status: Optional[str] = None,
+        job_id: int | None = None,
+        status: str | None = None,
         skip: int = 0, 
         limit: int = 100
-    ) -> List[ApplicationModel]:
+    ) -> list[ApplicationModel]:
         query = select(ApplicationModel)
         
         if job_id:
@@ -723,9 +745,9 @@ class MatchingService:
         
         query = query.offset(skip).limit(limit)
         result = await db.execute(query)
-        return result.scalars().all()
+        return list(result.scalars().all())
     
-    async def get_application(self, db: AsyncSession, application_id: int) -> Optional[Tuple[ApplicationModel, JobModel, ResumeModel]]:
+    async def get_application(self, db: AsyncSession, application_id: int) -> tuple[ApplicationModel, JobModel, ResumeModel] | None:
         query = select(ApplicationModel, JobModel, ResumeModel) \
             .join(JobModel, ApplicationModel.job_id == JobModel.id) \
             .join(ResumeModel, ApplicationModel.resume_id == ResumeModel.id) \
@@ -735,7 +757,7 @@ class MatchingService:
         row = result.first()
         
         if row:
-            return row
+            return row[0], row[1], row[2]
         return None
     
     async def update_application_status(
@@ -743,12 +765,12 @@ class MatchingService:
         db: AsyncSession, 
         application_id: int, 
         status: str
-    ) -> Optional[ApplicationModel]:
+    ) -> ApplicationModel | None:
         application = await db.get(ApplicationModel, application_id)
         if application:
             application.status = status
             if status != "New":
-                application.reviewed_at = datetime.utcnow()
+                application.reviewed_at = datetime.now(timezone.utc)
             
             await db.commit()
             await db.refresh(application)
@@ -757,7 +779,7 @@ class MatchingService:
 
 
 class UserService:
-    async def create_user(self, db: AsyncSession, user_data: Dict[str, Any], hashed_password: str) -> UserModel:
+    async def create_user(self, db: AsyncSession, user_data: dict[str, Any], hashed_password: str) -> UserModel:
         user = UserModel(
             email=user_data["email"],
             hashed_password=hashed_password,
@@ -770,11 +792,11 @@ class UserService:
         await db.refresh(user)
         return user
     
-    async def get_user_by_email(self, db: AsyncSession, email: str) -> Optional[UserModel]:
+    async def get_user_by_email(self, db: AsyncSession, email: str) -> UserModel | None:
         result = await db.execute(select(UserModel).where(UserModel.email == email))
         return result.scalars().first()
     
-    async def get_user_by_id(self, db: AsyncSession, user_id: int) -> Optional[UserModel]:
+    async def get_user_by_id(self, db: AsyncSession, user_id: int) -> UserModel | None:
         return await db.get(UserModel, user_id)
 
 
