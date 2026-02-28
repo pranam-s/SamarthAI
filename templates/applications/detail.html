@@ -344,6 +344,7 @@
                 <h2 class="card-title">Update Status</h2>
                 
                 <form method="post" action="/applications/{{ application.id }}/update-status">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                     <div class="form-control">
                         <label class="label">
                             <span class="label-text">Application Status</span>

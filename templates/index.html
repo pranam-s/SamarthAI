@@ -1,21 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}{{ app_name }} - AI-Powered Job Matching{% endblock %}
+{% block title %}{{ app_name }} - {{ t('home.hero.title') }}{% endblock %}
 
 {% block content %}
 <div class="hero min-h-[80vh] bg-base-200 rounded-xl">
     <div class="hero-content flex-col lg:flex-row-reverse">
         <img src="https://placehold.co/600x400/3b82f6/ffffff?text=AI+Job+Matching&font=Montserrat" class="max-w-sm rounded-lg shadow-2xl" alt="Job Matching" />
         <div>
-            <h1 class="text-5xl font-bold">AI-Powered Job Matching Platform</h1>
-            <p class="py-6">Find the perfect match between resumes and job descriptions using advanced AI technology. For job seekers, get personalized feedback on your applications. For recruiters, discover the most qualified candidates efficiently.</p>
+            <h1 class="text-5xl font-bold">{{ t('home.hero.title') }}</h1>
+            <p class="py-6">{{ t('home.hero.subtitle') }}</p>
             {% if not user %}
             <div class="flex gap-4">
-                <a href="/register" class="btn btn-primary">Get Started</a>
-                <a href="/login" class="btn btn-outline">Login</a>
+                <a href="/register" class="btn btn-primary">{{ t('nav.register') }}</a>
+                <a href="/login" class="btn btn-outline">{{ t('nav.login') }}</a>
             </div>
             {% else %}
-            <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
+            <a href="/dashboard" class="btn btn-primary">{{ t('nav.dashboard') }}</a>
             {% endif %}
         </div>
     </div>

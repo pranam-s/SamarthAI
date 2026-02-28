@@ -6,9 +6,7 @@
 <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold">{{ job.title }}</h1>
     <div>
-        {% if user.is_recruiter and job.company_id == user.id %}
-        <a href="/jobs/{{ job.id }}/edit" class="btn btn-outline">Edit Job</a>
-        {% elif not user.is_recruiter %}
+        {% if not user.is_recruiter %}
             {% if user_applications %}
             <div class="badge badge-lg badge-success">You've Applied</div>
             {% else %}
@@ -146,6 +144,7 @@
     <div class="modal-box">
         <h3 class="font-bold text-lg">Apply for {{ job.title }}</h3>
         <form method="post" action="/applications/create" class="mt-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
             <input type="hidden" name="job_id" value="{{ job.id }}" />
             <div class="form-control">
                 <label class="label">

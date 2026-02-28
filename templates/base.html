@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ locale|default('en') }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -29,6 +29,7 @@
     {% block head %}{% endblock %}
 </head>
 <body class="min-h-screen bg-base-200">
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 btn btn-sm">Skip to content</a>
     <div class="drawer lg:drawer-open">
         <input id="my-drawer" type="checkbox" class="drawer-toggle" />
         
@@ -41,7 +42,7 @@
                     </label>
                 </div>
                 <div class="flex-1">
-                    <a href="/" class="btn btn-ghost normal-case text-xl">{{ app_name }}</a>
+                    <a href="/" class="btn btn-ghost normal-case text-xl" aria-label="{{ t('nav.home') }}">{{ app_name }}</a>
                 </div>
                 <div class="flex-none">
                     {% if user %}
@@ -52,18 +53,18 @@
                             </div>
                         </label>
                         <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
-                            <li><a href="/dashboard">Dashboard</a></li>
-                            <li><a href="/logout">Logout</a></li>
+                            <li><a href="/dashboard">{{ t('nav.dashboard') }}</a></li>
+                            <li><a href="/logout">{{ t('nav.logout') }}</a></li>
                         </ul>
                     </div>
                     {% else %}
-                    <a href="/login" class="btn btn-primary">Login</a>
+                    <a href="/login" class="btn btn-primary">{{ t('nav.login') }}</a>
                     {% endif %}
                 </div>
             </div>
             
             <!-- Page content -->
-            <main class="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+            <main id="main-content" class="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8" role="main">
                 {% if error %}
                 <div class="alert alert-error mb-4">
                     <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -77,7 +78,7 @@
             <!-- Footer -->
             <footer class="footer footer-center p-4 bg-base-200 text-base-content">
                 <div>
-                    <p>Copyright © {{ now.year }} - AI-Powered Job Matching Platform</p>
+                    <p>Copyright © {{ now.year }} - {{ t('footer.copy') }}</p>
                 </div>
             </footer>
         </div>
@@ -91,16 +92,16 @@
                 </div>
                 
                 <ul class="menu p-4 w-full text-base-content">
-                    <li><a href="/" class="{% if active_page == 'home' %}active{% endif %}">Home</a></li>
+                    <li><a href="/" class="{% if active_page == 'home' %}active{% endif %}">{{ t('nav.home') }}</a></li>
                     
                     {% if user %}
-                    <li><a href="/dashboard" class="{% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a></li>
-                    <li><a href="/resumes" class="{% if active_page == 'resumes' %}active{% endif %}">Resumes</a></li>
-                    <li><a href="/jobs" class="{% if active_page == 'jobs' %}active{% endif %}">Jobs</a></li>
-                    <li><a href="/applications" class="{% if active_page == 'applications' %}active{% endif %}">Applications</a></li>
+                    <li><a href="/dashboard" class="{% if active_page == 'dashboard' %}active{% endif %}">{{ t('nav.dashboard') }}</a></li>
+                    <li><a href="/resumes" class="{% if active_page == 'resumes' %}active{% endif %}">{{ t('nav.resumes') }}</a></li>
+                    <li><a href="/jobs" class="{% if active_page == 'jobs' %}active{% endif %}">{{ t('nav.jobs') }}</a></li>
+                    <li><a href="/applications" class="{% if active_page == 'applications' %}active{% endif %}">{{ t('nav.applications') }}</a></li>
                     
                     {% if user.is_recruiter %}
-                    <li><a href="/analysis" class="{% if active_page == 'analysis' %}active{% endif %}">Market Analysis</a></li>
+                    <li><a href="/analysis" class="{% if active_page == 'analysis' %}active{% endif %}">{{ t('nav.analysis') }}</a></li>
                     {% endif %}
                     
                     <div class="divider"></div>
@@ -117,11 +118,24 @@
                         </div>
                     </div>
                     
-                    <li><a href="/logout" class="text-error">Logout</a></li>
+                    <li><a href="/logout" class="text-error">{{ t('nav.logout') }}</a></li>
                     {% else %}
-                    <li><a href="/login" class="{% if active_page == 'login' %}active{% endif %}">Login</a></li>
-                    <li><a href="/register" class="{% if active_page == 'register' %}active{% endif %}">Register</a></li>
+                    <li><a href="/login" class="{% if active_page == 'login' %}active{% endif %}">{{ t('nav.login') }}</a></li>
+                    <li><a href="/register" class="{% if active_page == 'register' %}active{% endif %}">{{ t('nav.register') }}</a></li>
                     {% endif %}
+
+                    <div class="divider"></div>
+                    <form method="post" action="/set-locale" class="p-2">
+                        <input type="hidden" name="redirect_to" value="{{ request.url.path }}" />
+                        <label class="label" for="locale-select">
+                            <span class="label-text">{{ t('common.language') }}</span>
+                        </label>
+                        <select id="locale-select" name="locale" class="select select-bordered w-full" onchange="this.form.submit()" aria-label="{{ t('common.language') }}">
+                            {% for option in supported_locales %}
+                            <option value="{{ option }}" {% if option == locale %}selected{% endif %}>{{ option }}</option>
+                            {% endfor %}
+                        </select>
+                    </form>
                 </ul>
             </aside>
         </div>

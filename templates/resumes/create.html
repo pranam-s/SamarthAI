@@ -13,6 +13,7 @@
         </div>
         
         <form method="post" action="/resumes/create" enctype="multipart/form-data" x-data="{ fileName: '' }">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
             <div id="file-section">
                 <div class="form-control">
                     <label class="label">
