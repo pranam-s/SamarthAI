@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 class TokenPayload(BaseModel):
@@ -28,24 +28,22 @@ class UserUpdate(UserBase):
 
 
 class UserInDB(UserBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     is_active: bool
     created_at: datetime
     updated_at: datetime | None = None
     hashed_password: str
 
-    class Config:
-        from_attributes = True
-
 
 class User(UserBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     is_active: bool
     created_at: datetime
     updated_at: datetime | None = None
-
-    class Config:
-        from_attributes = True
 
 
 class SkillBase(BaseModel):
@@ -113,13 +111,12 @@ class ResumeUpdate(ResumeBase):
 
 
 class Resume(ResumeBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     file_path: str | None = None
     created_at: datetime
     updated_at: datetime | None = None
-
-    class Config:
-        from_attributes = True
 
 
 class ResumeUpload(BaseModel):
@@ -136,7 +133,7 @@ class SkillRequirement(BaseModel):
 class JobBase(BaseModel):
     company_id: int | None = None
     title: str
-    description_text: str
+    description_text: str | None = None
     required_skills: list[dict[str, Any]] | None = []
     preferred_skills: list[dict[str, Any]] | None = []
     responsibilities: list[str] | None = []
@@ -148,17 +145,23 @@ class JobCreate(JobBase):
     pass
 
 
-class JobUpdate(JobBase):
-    pass
+class JobUpdate(BaseModel):
+    company_id: int | None = None
+    title: str | None = None
+    description_text: str | None = None
+    required_skills: list[dict[str, Any]] | None = None
+    preferred_skills: list[dict[str, Any]] | None = None
+    responsibilities: list[str] | None = None
+    qualifications: list[str] | None = None
+    priority_weights: dict[str, float] | None = None
 
 
 class Job(JobBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     created_at: datetime
     updated_at: datetime | None = None
-
-    class Config:
-        from_attributes = True
 
 
 class ApplicationBase(BaseModel):
@@ -181,16 +184,15 @@ class ApplicationUpdate(BaseModel):
 
 
 class Application(ApplicationBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
-    match_score: float
-    match_details: dict[str, Any]
-    feedback: dict[str, Any]
+    match_score: float = 0.0
+    match_details: dict[str, Any] = {}
+    feedback: dict[str, Any] = {}
     status: str
     created_at: datetime
     reviewed_at: datetime | None = None
-
-    class Config:
-        from_attributes = True
 
 
 class ApplicationWithDetails(Application):
@@ -260,3 +262,31 @@ class MatchDetails(BaseModel):
     overall_match: float = 0.0
     sections: MatchSections = MatchSections()
     weights_applied: MatchWeights = MatchWeights()
+
+
+# ---------------------------------------------------------------------------
+# Skills Gap Analysis (new feature)
+# ---------------------------------------------------------------------------
+
+
+class SkillsGapRequest(BaseModel):
+    resume_id: int
+    job_id: int
+
+
+class SkillGapItem(BaseModel):
+    skill: str
+    status: str  # "matched", "missing_required", "missing_preferred"
+    importance: float = 0.0
+    learning_suggestion: str = ""
+
+
+class SkillsGapResponse(BaseModel):
+    resume_id: int
+    job_id: int
+    gap_score: float  # 0-100, higher = better coverage
+    matched_skills: list[str] = []
+    missing_required: list[SkillGapItem] = []
+    missing_preferred: list[SkillGapItem] = []
+    learning_path: list[str] = []
+    summary: str = ""

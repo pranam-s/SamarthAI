@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Jobs - {{ app_name }}{% endblock %}
+{% block title %}{{ t('jobs.title') }} - {{ app_name }}{% endblock %}
 
 {% block content %}
 <div class="flex justify-between items-center mb-6">
-    <h1 class="text-2xl font-bold">Jobs</h1>
+    <h1 class="text-2xl font-bold">{{ t('jobs.title') }}</h1>
     {% if user.is_recruiter %}
-    <a href="/jobs/create" class="btn btn-primary">Post New Job</a>
+    <a href="/jobs/create" class="btn btn-primary">{{ t('jobs.post_new') }}</a>
     {% endif %}
 </div>
 
@@ -19,19 +19,19 @@
             <p class="line-clamp-3">{{ job.description_text[:150] }}...</p>
             
             <div class="mt-4">
-                <h3 class="font-semibold">Required Skills:</h3>
+                <h3 class="font-semibold">{{ t('jobs.required_skills') }}:</h3>
                 <div class="flex flex-wrap gap-2 mt-1">
                     {% for skill in job.required_skills[:5] %}
                     <div class="badge badge-primary">{{ skill.name }}</div>
                     {% endfor %}
                     {% if job.required_skills|length > 5 %}
-                    <div class="badge badge-outline">+{{ job.required_skills|length - 5 }} more</div>
+                    <div class="badge badge-outline">+{{ job.required_skills|length - 5 }} {{ t('common.more') }}</div>
                     {% endif %}
                 </div>
             </div>
             
             <div class="card-actions justify-end mt-4">
-                <a href="/jobs/{{ job.id }}" class="btn btn-primary btn-sm">View Details</a>
+                <a href="/jobs/{{ job.id }}" class="btn btn-primary btn-sm">{{ t('jobs.view_details') }}</a>
             </div>
         </div>
     </div>
@@ -40,14 +40,14 @@
 {% else %}
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-        <h2 class="card-title">No Jobs Found</h2>
+        <h2 class="card-title">{{ t('jobs.no_jobs_found') }}</h2>
         {% if user.is_recruiter %}
-        <p>You haven't posted any jobs yet. Get started by creating your first job posting.</p>
+        <p>{{ t('jobs.no_jobs_recruiter') }}</p>
         <div class="card-actions justify-end mt-4">
-            <a href="/jobs/create" class="btn btn-primary">Post New Job</a>
+            <a href="/jobs/create" class="btn btn-primary">{{ t('jobs.post_new') }}</a>
         </div>
         {% else %}
-        <p>No job postings are available at the moment. Please check back later.</p>
+        <p>{{ t('jobs.no_jobs_seeker') }}</p>
         {% endif %}
     </div>
 </div>

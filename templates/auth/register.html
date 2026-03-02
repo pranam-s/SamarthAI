@@ -10,29 +10,29 @@
             
             <form method="post" action="/register">
                 <div class="form-control">
-                    <label class="label">
+                    <label class="label" for="email">
                         <span class="label-text">{{ t('auth.email') }}</span>
                     </label>
-                    <input type="email" name="email" placeholder="your@email.com" class="input input-bordered" required />
+                    <input id="email" type="email" name="email" placeholder="{{ t('auth.placeholder.email') }}" class="input input-bordered" required />
                 </div>
                 
                 <div class="form-control mt-4">
-                    <label class="label">
+                    <label class="label" for="full_name">
                         <span class="label-text">{{ t('auth.full_name') }}</span>
                     </label>
-                    <input type="text" name="full_name" placeholder="John Doe" class="input input-bordered" required />
+                    <input id="full_name" type="text" name="full_name" placeholder="{{ t('auth.placeholder.full_name') }}" class="input input-bordered" required />
                 </div>
                 
                 <div class="form-control mt-4">
-                    <label class="label">
+                    <label class="label" for="password">
                         <span class="label-text">{{ t('auth.password') }}</span>
                     </label>
-                    <input type="password" name="password" placeholder="Password" class="input input-bordered" required />
+                    <input id="password" type="password" name="password" placeholder="{{ t('auth.placeholder.password') }}" class="input input-bordered" required />
                 </div>
                 
                 <div class="form-control mt-4">
-                    <label class="label cursor-pointer justify-start">
-                        <input type="checkbox" name="is_recruiter" class="checkbox checkbox-primary mr-2" />
+                    <label class="label cursor-pointer justify-start" for="is_recruiter">
+                        <input id="is_recruiter" type="checkbox" name="is_recruiter" class="checkbox checkbox-primary mr-2" />
                         <span class="label-text">{{ t('auth.recruiter') }}</span>
                     </label>
                 </div>
@@ -43,7 +43,7 @@
             </form>
             
             <div class="text-center mt-4">
-                <p>Already have an account? <a href="/login" class="link link-primary">Login here</a></p>
+                <p>{{ t('auth.have_account') }} <a href="/login" class="link link-primary">{{ t('auth.login_here') }}</a></p>
             </div>
         </div>
     </div>

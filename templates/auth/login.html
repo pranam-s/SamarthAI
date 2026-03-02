@@ -10,24 +10,24 @@
             
             {% if request.query_params.get('registered') == 'true' %}
             <div class="alert alert-success mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                <span>Registration successful! Please login.</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span>{{ t('auth.register.success') }}</span>
             </div>
             {% endif %}
             
             <form method="post" action="/login">
                 <div class="form-control">
-                    <label class="label">
+                    <label class="label" for="email">
                         <span class="label-text">{{ t('auth.email') }}</span>
                     </label>
-                    <input type="email" name="email" placeholder="your@email.com" class="input input-bordered" required />
+                    <input id="email" type="email" name="email" placeholder="{{ t('auth.placeholder.email') }}" class="input input-bordered" required />
                 </div>
                 
                 <div class="form-control mt-4">
-                    <label class="label">
+                    <label class="label" for="password">
                         <span class="label-text">{{ t('auth.password') }}</span>
                     </label>
-                    <input type="password" name="password" placeholder="Password" class="input input-bordered" required />
+                    <input id="password" type="password" name="password" placeholder="{{ t('auth.placeholder.password') }}" class="input input-bordered" required />
                 </div>
                 
                 <div class="form-control mt-6">
@@ -36,7 +36,7 @@
             </form>
             
             <div class="text-center mt-4">
-                <p>Don't have an account? <a href="/register" class="link link-primary">Register here</a></p>
+                <p>{{ t('auth.no_account') }} <a href="/register" class="link link-primary">{{ t('auth.register_here') }}</a></p>
             </div>
         </div>
     </div>

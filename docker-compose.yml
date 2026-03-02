@@ -4,13 +4,28 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./uploads:/app/uploads
-      - ./job_matcher.db:/app/job_matcher.db
+      - uploads_data:/app/uploads
+      - db_data:/app/data
+    env_file:
+      - .env
     environment:
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - SECRET_KEY=${SECRET_KEY}
-      - ENVIRONMENT=production
+      - ENVIRONMENT=development
       - COOKIE_SECURE=false
       - APP_URL=http://localhost:8000
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+
+volumes:
+  uploads_data:
+  db_data:

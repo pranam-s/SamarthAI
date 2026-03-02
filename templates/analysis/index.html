@@ -1,35 +1,35 @@
 {% extends "base.html" %}
 
-{% block title %}Market Analysis - {{ app_name }}{% endblock %}
+{% block title %}{{ t('analysis.title') }} - {{ app_name }}{% endblock %}
 
 {% block content %}
 <div class="flex justify-between items-center mb-6">
-    <h1 class="text-2xl font-bold">Job Market Analysis</h1>
-    <p class="text-sm opacity-70">Last updated: {{ analysis.analysis_date|replace('T', ' ')|replace('Z', '') }}</p>
+    <h1 class="text-2xl font-bold">{{ t('analysis.title') }}</h1>
+    <p class="text-sm opacity-70">{{ t('analysis.last_updated') }}: {{ analysis.analysis_date|replace('T', ' ')|replace('Z', '') }}</p>
 </div>
 
 <div class="card bg-base-100 shadow-xl mb-6">
     <div class="card-body">
-        <h2 class="card-title">Overview</h2>
-        <p>Analysis based on {{ analysis.total_jobs_analyzed }} jobs from our platform.</p>
+        <h2 class="card-title">{{ t('analysis.overview') }}</h2>
+        <p>{{ t('analysis.based_on') }} {{ analysis.total_jobs_analyzed }} {{ t('analysis.jobs_from_platform') }}</p>
         
         <div class="stats shadow mt-4">
             <div class="stat">
-                <div class="stat-title">Total Jobs</div>
+                <div class="stat-title">{{ t('analysis.total_jobs') }}</div>
                 <div class="stat-value">{{ analysis.total_jobs_analyzed }}</div>
-                <div class="stat-desc">Analyzed for trends</div>
+                <div class="stat-desc">{{ t('analysis.analyzed_for_trends') }}</div>
             </div>
             
             <div class="stat">
-                <div class="stat-title">Unique Required Skills</div>
+                <div class="stat-title">{{ t('analysis.unique_required') }}</div>
                 <div class="stat-value">{{ analysis.top_required_skills|length }}</div>
-                <div class="stat-desc">Most in-demand skills</div>
+                <div class="stat-desc">{{ t('analysis.in_demand') }}</div>
             </div>
             
             <div class="stat">
-                <div class="stat-title">Unique Preferred Skills</div>
+                <div class="stat-title">{{ t('analysis.unique_preferred') }}</div>
                 <div class="stat-value">{{ analysis.top_preferred_skills|length }}</div>
-                <div class="stat-desc">Trending secondary skills</div>
+                <div class="stat-desc">{{ t('analysis.trending_secondary') }}</div>
             </div>
         </div>
     </div>
@@ -39,7 +39,7 @@
     <!-- Top Required Skills -->
     <div class="card bg-base-100 shadow-xl">
         <div class="card-body">
-            <h2 class="card-title">Top Required Skills</h2>
+            <h2 class="card-title">{{ t('analysis.top_required') }}</h2>
             
             <div class="mt-4" style="height: 300px">
                 <canvas id="requiredSkillsChart"></canvas>
@@ -49,9 +49,9 @@
                 <table class="table table-zebra">
                     <thead>
                         <tr>
-                            <th>Skill</th>
-                            <th>Count</th>
-                            <th>Percentage</th>
+                            <th>{{ t('analysis.skill') }}</th>
+                            <th>{{ t('analysis.count') }}</th>
+                            <th>{{ t('analysis.percentage') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -71,7 +71,7 @@
     <!-- Top Preferred Skills -->
     <div class="card bg-base-100 shadow-xl">
         <div class="card-body">
-            <h2 class="card-title">Top Preferred Skills</h2>
+            <h2 class="card-title">{{ t('analysis.top_preferred') }}</h2>
             
             <div class="mt-4" style="height: 300px">
                 <canvas id="preferredSkillsChart"></canvas>
@@ -81,9 +81,9 @@
                 <table class="table table-zebra">
                     <thead>
                         <tr>
-                            <th>Skill</th>
-                            <th>Count</th>
-                            <th>Percentage</th>
+                            <th>{{ t('analysis.skill') }}</th>
+                            <th>{{ t('analysis.count') }}</th>
+                            <th>{{ t('analysis.percentage') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -112,7 +112,7 @@
             data: {
                 labels: [{% for skill in analysis.top_required_skills %}'{{ skill.name }}',{% endfor %}],
                 datasets: [{
-                    label: 'Job Count',
+                    label: "{{ t('analysis.chart_job_count') }}",
                     data: [{% for skill in analysis.top_required_skills %}{{ skill.count }},{% endfor %}],
                     backgroundColor: [
                         'rgba(54, 162, 235, 0.6)',
@@ -148,13 +148,13 @@
                         beginAtZero: true,
                         title: {
                             display: true,
-                            text: 'Number of Jobs'
+                            text: "{{ t('analysis.chart_jobs_axis') }}"
                         }
                     },
                     x: {
                         title: {
                             display: true,
-                            text: 'Skills'
+                            text: "{{ t('analysis.chart_skills_axis') }}"
                         }
                     }
                 }
@@ -168,7 +168,7 @@
             data: {
                 labels: [{% for skill in analysis.top_preferred_skills %}'{{ skill.name }}',{% endfor %}],
                 datasets: [{
-                    label: 'Job Count',
+                    label: "{{ t('analysis.chart_job_count') }}",
                     data: [{% for skill in analysis.top_preferred_skills %}{{ skill.count }},{% endfor %}],
                     backgroundColor: [
                         'rgba(255, 99, 132, 0.6)',
@@ -204,13 +204,13 @@
                         beginAtZero: true,
                         title: {
                             display: true,
-                            text: 'Number of Jobs'
+                            text: "{{ t('analysis.chart_jobs_axis') }}"
                         }
                     },
                     x: {
                         title: {
                             display: true,
-                            text: 'Skills'
+                            text: "{{ t('analysis.chart_skills_axis') }}"
                         }
                     }
                 }

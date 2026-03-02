@@ -172,3 +172,16 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Project-specific
+SamarthAI_1.md
+agents.md
+plan.md
+tmp_dep_audit.ps1
+*.db
+*.sqlite
+*.sqlite3
+uploads/*
+!uploads/.gitkeep
+.env
+.env.*

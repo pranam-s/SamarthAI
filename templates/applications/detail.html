@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 
-{% block title %}Application Details - {{ app_name }}{% endblock %}
+{% block title %}{{ t('applications.details') }} - {{ app_name }}{% endblock %}
 
 {% block content %}
 <div class="flex justify-between items-center mb-6">
     <div>
-        <h1 class="text-2xl font-bold">Application #{{ application.id }}</h1>
-        <p class="text-sm opacity-70">Submitted on {{ application.created_at.strftime('%Y-%m-%d') }}</p>
+        <h1 class="text-2xl font-bold">{{ t('applications.details') }} #{{ application.id }}</h1>
+        <p class="text-sm opacity-70">{{ t('applications.submitted_on') }} {{ application.created_at.strftime('%Y-%m-%d') }}</p>
     </div>
     <div>
         <span class="badge badge-lg {% if application.status == 'Shortlisted' %}badge-success{% elif application.status == 'Rejected' %}badge-error{% else %}badge-info{% endif %}">
-            {{ application.status }}
+            {{ t('status.' ~ application.status|lower) }}
         </span>
     </div>
 </div>
@@ -19,7 +19,7 @@
     <!-- Main Application Card -->
     <div class="card bg-base-100 shadow-xl lg:col-span-2">
         <div class="card-body">
-            <h2 class="card-title">Match Analysis</h2>
+            <h2 class="card-title">{{ t('applications.match_analysis') }}</h2>
             
             <div class="flex justify-center my-6">
                 <div class="radial-progress text-primary" style="--value:{{ match_score }}; --size:10rem; --thickness: 12px;">
@@ -27,29 +27,29 @@
                 </div>
             </div>
             
-            <div class="tabs tabs-boxed mb-4">
-                <a class="tab tab-active" id="details-tab" onclick="switchTab('details')">Match Details</a>
-                <a class="tab" id="feedback-tab" onclick="switchTab('feedback')">Feedback</a>
+            <div class="tabs tabs-boxed mb-4" role="tablist" aria-label="{{ t('applications.match_analysis') }}">
+                <button type="button" class="tab tab-active" id="details-tab" role="tab" aria-selected="true" aria-controls="details-section" onclick="switchTab('details')">{{ t('applications.match_details') }}</button>
+                <button type="button" class="tab" id="feedback-tab" role="tab" aria-selected="false" aria-controls="feedback-section" onclick="switchTab('feedback')">{{ t('applications.feedback') }}</button>
             </div>
             
             <!-- Match Details Section -->
-            <div id="details-section">
+            <div id="details-section" role="tabpanel" aria-labelledby="details-tab">
                 {% if match_details %}
                 
                 <!-- Skills Section -->
                 <div class="mb-6">
-                    <h3 class="font-bold text-lg">Skills Match</h3>
-                    <p class="text-sm">Score: {{ match_details.sections.skills.score|round }}%</p>
+                    <h3 class="font-bold text-lg">{{ t('applications.skills_match') }}</h3>
+                    <p class="text-sm">{{ t('applications.score') }}: {{ match_details.sections.skills.score|round }}%</p>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <div class="card bg-base-200">
                             <div class="card-body p-4">
-                                <h4 class="font-semibold">Required Skills</h4>
-                                <p class="text-sm">Match rate: {{ match_details.sections.skills.required.match_rate|round }}%</p>
+                                <h4 class="font-semibold">{{ t('applications.required') }}</h4>
+                                <p class="text-sm">{{ t('applications.match_rate') }}: {{ match_details.sections.skills.required.match_rate|round }}%</p>
                                 
                                 {% if match_details.sections.skills.required.matched %}
                                 <div class="mt-2">
-                                    <span class="text-sm font-medium">Matched:</span>
+                                    <span class="text-sm font-medium">{{ t('applications.matched') }}:</span>
                                     <div class="flex flex-wrap gap-2 mt-1">
                                         {% for skill in match_details.sections.skills.required.matched %}
                                         <div class="badge badge-success">{{ skill }}</div>
@@ -60,7 +60,7 @@
                                 
                                 {% if match_details.sections.skills.required.missing %}
                                 <div class="mt-2">
-                                    <span class="text-sm font-medium">Missing:</span>
+                                    <span class="text-sm font-medium">{{ t('applications.missing') }}:</span>
                                     <div class="flex flex-wrap gap-2 mt-1">
                                         {% for skill in match_details.sections.skills.required.missing %}
                                         <div class="badge badge-error">{{ skill }}</div>
@@ -73,12 +73,12 @@
                         
                         <div class="card bg-base-200">
                             <div class="card-body p-4">
-                                <h4 class="font-semibold">Preferred Skills</h4>
-                                <p class="text-sm">Match rate: {{ match_details.sections.skills.preferred.match_rate|round }}%</p>
+                                <h4 class="font-semibold">{{ t('applications.preferred') }}</h4>
+                                <p class="text-sm">{{ t('applications.match_rate') }}: {{ match_details.sections.skills.preferred.match_rate|round }}%</p>
                                 
                                 {% if match_details.sections.skills.preferred.matched %}
                                 <div class="mt-2">
-                                    <span class="text-sm font-medium">Matched:</span>
+                                    <span class="text-sm font-medium">{{ t('applications.matched') }}:</span>
                                     <div class="flex flex-wrap gap-2 mt-1">
                                         {% for skill in match_details.sections.skills.preferred.matched %}
                                         <div class="badge badge-success">{{ skill }}</div>
@@ -89,7 +89,7 @@
                                 
                                 {% if match_details.sections.skills.preferred.missing %}
                                 <div class="mt-2">
-                                    <span class="text-sm font-medium">Missing:</span>
+                                    <span class="text-sm font-medium">{{ t('applications.missing') }}:</span>
                                     <div class="flex flex-wrap gap-2 mt-1">
                                         {% for skill in match_details.sections.skills.preferred.missing %}
                                         <div class="badge badge-warning">{{ skill }}</div>
@@ -104,14 +104,14 @@
                 
                 <!-- Experience Section -->
                 <div class="mb-6">
-                    <h3 class="font-bold text-lg">Experience Match</h3>
-                    <p class="text-sm">Score: {{ match_details.sections.experience.score|round }}%</p>
+                    <h3 class="font-bold text-lg">{{ t('applications.experience_match') }}</h3>
+                    <p class="text-sm">{{ t('applications.score') }}: {{ match_details.sections.experience.score|round }}%</p>
                     
                     <div class="card bg-base-200 mt-4">
                         <div class="card-body p-4">
                             {% if match_details.sections.experience.matching_aspects %}
                             <div class="mt-2">
-                                <span class="text-sm font-medium">Matching Aspects:</span>
+                                <span class="text-sm font-medium">{{ t('applications.matching_aspects') }}:</span>
                                 <ul class="list-disc list-inside mt-1">
                                     {% for aspect in match_details.sections.experience.matching_aspects %}
                                     <li>{{ aspect }}</li>
@@ -122,7 +122,7 @@
                             
                             {% if match_details.sections.experience.missing_aspects %}
                             <div class="mt-2">
-                                <span class="text-sm font-medium">Missing Aspects:</span>
+                                <span class="text-sm font-medium">{{ t('applications.missing_aspects') }}:</span>
                                 <ul class="list-disc list-inside mt-1">
                                     {% for aspect in match_details.sections.experience.missing_aspects %}
                                     <li>{{ aspect }}</li>
@@ -133,7 +133,7 @@
                             
                             {% if match_details.sections.experience.experience_entries %}
                             <div class="mt-4">
-                                <span class="text-sm font-medium">Experience Analysis:</span>
+                                <span class="text-sm font-medium">{{ t('applications.experience_analysis') }}:</span>
                                 <div class="space-y-2 mt-2">
                                     {% for entry in match_details.sections.experience.experience_entries %}
                                     <div class="flex justify-between items-center p-2 bg-base-300 rounded-lg">
@@ -162,18 +162,18 @@
                 
                 <!-- Education Section -->
                 <div class="mb-6">
-                    <h3 class="font-bold text-lg">Education Match</h3>
-                    <p class="text-sm">Score: {{ match_details.sections.education.score|round }}%</p>
+                    <h3 class="font-bold text-lg">{{ t('applications.education_match') }}</h3>
+                    <p class="text-sm">{{ t('applications.score') }}: {{ match_details.sections.education.score|round }}%</p>
                     
                     <div class="card bg-base-200 mt-4">
                         <div class="card-body p-4">
                             {% if match_details.sections.education.highest_education %}
-                            <p><span class="font-medium">Highest Education:</span> {{ match_details.sections.education.highest_education|capitalize }}</p>
+                            <p><span class="font-medium">{{ t('applications.highest_education') }}:</span> {{ match_details.sections.education.highest_education|capitalize }}</p>
                             {% endif %}
                             
                             {% if match_details.sections.education.matching_aspects %}
                             <div class="mt-2">
-                                <span class="text-sm font-medium">Matching Aspects:</span>
+                                <span class="text-sm font-medium">{{ t('applications.matching_aspects') }}:</span>
                                 <ul class="list-disc list-inside mt-1">
                                     {% for aspect in match_details.sections.education.matching_aspects %}
                                     <li>{{ aspect }}</li>
@@ -184,7 +184,7 @@
                             
                             {% if match_details.sections.education.missing_aspects %}
                             <div class="mt-2">
-                                <span class="text-sm font-medium">Missing Aspects:</span>
+                                <span class="text-sm font-medium">{{ t('applications.missing_aspects') }}:</span>
                                 <ul class="list-disc list-inside mt-1">
                                     {% for aspect in match_details.sections.education.missing_aspects %}
                                     <li>{{ aspect }}</li>
@@ -198,7 +198,7 @@
                 
                 <!-- Weights Applied -->
                 <div class="mb-6">
-                    <h3 class="font-bold text-lg">Match Weights</h3>
+                    <h3 class="font-bold text-lg">{{ t('applications.match_weights') }}</h3>
                     
                     <div class="flex flex-wrap gap-4 mt-4">
                         {% for section, weight in match_details.weights_applied.items() %}
@@ -209,17 +209,17 @@
                 
                 {% else %}
                 <div class="alert">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    <span>No detailed match data available.</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info shrink-0 w-6 h-6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>{{ t('applications.no_match_data') }}</span>
                 </div>
                 {% endif %}
             </div>
             
             <!-- Feedback Section -->
-            <div id="feedback-section" class="hidden">
+            <div id="feedback-section" class="hidden" role="tabpanel" aria-labelledby="feedback-tab">
                 {% if feedback %}
                 <div class="mb-6">
-                    <h3 class="font-bold text-lg">Strengths</h3>
+                    <h3 class="font-bold text-lg">{{ t('applications.strengths') }}</h3>
                     {% if feedback.strengths %}
                     <ul class="list-disc list-inside mt-2">
                         {% for strength in feedback.strengths %}
@@ -227,12 +227,12 @@
                         {% endfor %}
                     </ul>
                     {% else %}
-                    <p class="mt-2">No specific strengths identified.</p>
+                    <p class="mt-2">{{ t('applications.no_strengths') }}</p>
                     {% endif %}
                 </div>
                 
                 <div class="mb-6">
-                    <h3 class="font-bold text-lg">Improvement Areas</h3>
+                    <h3 class="font-bold text-lg">{{ t('applications.improvement_areas') }}</h3>
                     {% if feedback.improvements %}
                     <ul class="list-disc list-inside mt-2">
                         {% for improvement in feedback.improvements %}
@@ -240,12 +240,12 @@
                         {% endfor %}
                     </ul>
                     {% else %}
-                    <p class="mt-2">No specific improvements identified.</p>
+                    <p class="mt-2">{{ t('applications.no_improvements') }}</p>
                     {% endif %}
                 </div>
                 
                 <div class="mb-6">
-                    <h3 class="font-bold text-lg">Missing Skills</h3>
+                    <h3 class="font-bold text-lg">{{ t('applications.missing_skills') }}</h3>
                     {% if feedback.missing_skills %}
                     <div class="flex flex-wrap gap-2 mt-2">
                         {% for skill in feedback.missing_skills %}
@@ -253,12 +253,12 @@
                         {% endfor %}
                     </div>
                     {% else %}
-                    <p class="mt-2">No specific missing skills identified.</p>
+                    <p class="mt-2">{{ t('applications.no_missing_skills') }}</p>
                     {% endif %}
                 </div>
                 
                 <div class="mb-6">
-                    <h3 class="font-bold text-lg">Recommended Keywords</h3>
+                    <h3 class="font-bold text-lg">{{ t('applications.recommended_keywords') }}</h3>
                     {% if feedback.keyword_recommendations %}
                     <div class="flex flex-wrap gap-2 mt-2">
                         {% for keyword in feedback.keyword_recommendations %}
@@ -266,13 +266,13 @@
                         {% endfor %}
                     </div>
                     {% else %}
-                    <p class="mt-2">No specific keyword recommendations.</p>
+                    <p class="mt-2">{{ t('applications.no_keywords') }}</p>
                     {% endif %}
                 </div>
                 {% else %}
                 <div class="alert">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    <span>No feedback data available.</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info shrink-0 w-6 h-6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>{{ t('applications.no_feedback_data') }}</span>
                 </div>
                 {% endif %}
             </div>
@@ -284,24 +284,24 @@
         <!-- Job Details -->
         <div class="card bg-base-100 shadow-xl">
             <div class="card-body">
-                <h2 class="card-title">Job Details</h2>
+                <h2 class="card-title">{{ t('applications.job_details') }}</h2>
                 <p class="font-bold text-lg">{{ job.title }}</p>
                 <p class="line-clamp-3">{{ job.description_text[:100] }}...</p>
                 
                 <div class="mt-4">
-                    <h3 class="font-semibold">Required Skills</h3>
+                    <h3 class="font-semibold">{{ t('applications.required') }}</h3>
                     <div class="flex flex-wrap gap-2 mt-1">
                         {% for skill in job.required_skills[:5] %}
                         <div class="badge badge-primary">{{ skill.name }}</div>
                         {% endfor %}
                         {% if job.required_skills|length > 5 %}
-                        <div class="badge badge-outline">+{{ job.required_skills|length - 5 }} more</div>
+                        <div class="badge badge-outline">+{{ job.required_skills|length - 5 }} {{ t('common.more') }}</div>
                         {% endif %}
                     </div>
                 </div>
                 
                 <div class="card-actions justify-end mt-4">
-                    <a href="/jobs/{{ job.id }}" class="btn btn-sm btn-outline">View Full Job</a>
+                    <a href="/jobs/{{ job.id }}" class="btn btn-sm btn-outline">{{ t('jobs.view_full_job') }}</a>
                 </div>
             </div>
         </div>
@@ -309,21 +309,21 @@
         <!-- Applicant Details -->
         <div class="card bg-base-100 shadow-xl">
             <div class="card-body">
-                <h2 class="card-title">Applicant Details</h2>
+                <h2 class="card-title">{{ t('applications.applicant_details') }}</h2>
                 <div class="overflow-x-auto">
                     <table class="table">
                         <tbody>
                             <tr>
-                                <td class="font-medium">Name</td>
+                                <td class="font-medium">{{ t('common.name') }}</td>
                                 <td>{{ application.full_name }}</td>
                             </tr>
                             <tr>
-                                <td class="font-medium">Email</td>
+                                <td class="font-medium">{{ t('common.email') }}</td>
                                 <td>{{ application.email }}</td>
                             </tr>
                             {% if application.phone %}
                             <tr>
-                                <td class="font-medium">Phone</td>
+                                <td class="font-medium">{{ t('common.phone') }}</td>
                                 <td>{{ application.phone }}</td>
                             </tr>
                             {% endif %}
@@ -332,7 +332,7 @@
                 </div>
                 
                 <div class="card-actions justify-end mt-4">
-                    <a href="/resumes/{{ resume.id }}" class="btn btn-sm btn-outline">View Resume</a>
+                    <a href="/resumes/{{ resume.id }}" class="btn btn-sm btn-outline">{{ t('common.view') }} {{ t('applications.resume') }}</a>
                 </div>
             </div>
         </div>
@@ -341,24 +341,24 @@
         {% if user.is_recruiter and job.company_id == user.id %}
         <div class="card bg-base-100 shadow-xl">
             <div class="card-body">
-                <h2 class="card-title">Update Status</h2>
+                <h2 class="card-title">{{ t('applications.update_status') }}</h2>
                 
                 <form method="post" action="/applications/{{ application.id }}/update-status">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                     <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Application Status</span>
+                        <label class="label" for="application-status">
+                            <span class="label-text">{{ t('jobs.application_status') }}</span>
                         </label>
-                        <select name="status" class="select select-bordered w-full">
-                            <option value="New" {% if application.status == 'New' %}selected{% endif %}>New</option>
-                            <option value="Reviewed" {% if application.status == 'Reviewed' %}selected{% endif %}>Reviewed</option>
-                            <option value="Shortlisted" {% if application.status == 'Shortlisted' %}selected{% endif %}>Shortlisted</option>
-                            <option value="Rejected" {% if application.status == 'Rejected' %}selected{% endif %}>Rejected</option>
+                        <select id="application-status" name="status" class="select select-bordered w-full">
+                            <option value="New" {% if application.status == 'New' %}selected{% endif %}>{{ t('status.new') }}</option>
+                            <option value="Reviewed" {% if application.status == 'Reviewed' %}selected{% endif %}>{{ t('status.reviewed') }}</option>
+                            <option value="Shortlisted" {% if application.status == 'Shortlisted' %}selected{% endif %}>{{ t('status.shortlisted') }}</option>
+                            <option value="Rejected" {% if application.status == 'Rejected' %}selected{% endif %}>{{ t('status.rejected') }}</option>
                         </select>
                     </div>
                     
                     <div class="form-control mt-4">
-                        <button type="submit" class="btn btn-primary">Update Status</button>
+                        <button type="submit" class="btn btn-primary">{{ t('applications.update_status') }}</button>
                     </div>
                 </form>
             </div>
@@ -374,11 +374,15 @@
         if (tab === 'details') {
             document.getElementById('details-tab').classList.add('tab-active');
             document.getElementById('feedback-tab').classList.remove('tab-active');
+            document.getElementById('details-tab').setAttribute('aria-selected', 'true');
+            document.getElementById('feedback-tab').setAttribute('aria-selected', 'false');
             document.getElementById('details-section').classList.remove('hidden');
             document.getElementById('feedback-section').classList.add('hidden');
         } else {
             document.getElementById('details-tab').classList.remove('tab-active');
             document.getElementById('feedback-tab').classList.add('tab-active');
+            document.getElementById('details-tab').setAttribute('aria-selected', 'false');
+            document.getElementById('feedback-tab').setAttribute('aria-selected', 'true');
             document.getElementById('details-section').classList.add('hidden');
             document.getElementById('feedback-section').classList.remove('hidden');
         }

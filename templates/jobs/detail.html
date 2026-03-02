@@ -6,11 +6,14 @@
 <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold">{{ job.title }}</h1>
     <div>
+        {% if user.is_recruiter and job.company_id == user.id %}
+        <a href="/jobs/{{ job.id }}/edit" class="btn btn-outline btn-sm mr-2">{{ t('jobs.edit') }}</a>
+        {% endif %}
         {% if not user.is_recruiter %}
             {% if user_applications %}
-            <div class="badge badge-lg badge-success">You've Applied</div>
+            <div class="badge badge-lg badge-success">{{ t('jobs.applied') }}</div>
             {% else %}
-            <button class="btn btn-primary" onclick="document.getElementById('apply-modal').showModal()">Apply Now</button>
+            <button type="button" class="btn btn-primary" onclick="document.getElementById('apply-modal').showModal()">{{ t('jobs.apply_now') }}</button>
             {% endif %}
         {% endif %}
     </div>
@@ -20,12 +23,12 @@
     <!-- Main Job Card -->
     <div class="card bg-base-100 shadow-xl lg:col-span-2">
         <div class="card-body">
-            <h2 class="card-title">Job Description</h2>
+            <h2 class="card-title">{{ t('jobs.description') }}</h2>
             <div class="whitespace-pre-line">{{ job.description_text }}</div>
             
             <div class="divider"></div>
             
-            <h3 class="text-lg font-bold">Required Skills</h3>
+            <h3 class="text-lg font-bold">{{ t('jobs.required_skills') }}</h3>
             <div class="flex flex-wrap gap-2 mt-2">
                 {% for skill in job.required_skills %}
                 <div class="badge badge-lg badge-primary">{{ skill.name }}</div>
@@ -33,7 +36,7 @@
             </div>
             
             {% if job.preferred_skills %}
-            <h3 class="text-lg font-bold mt-6">Preferred Skills</h3>
+            <h3 class="text-lg font-bold mt-6">{{ t('jobs.preferred_skills') }}</h3>
             <div class="flex flex-wrap gap-2 mt-2">
                 {% for skill in job.preferred_skills %}
                 <div class="badge badge-lg badge-secondary">{{ skill.name }}</div>
@@ -42,7 +45,7 @@
             {% endif %}
             
             {% if job.responsibilities %}
-            <h3 class="text-lg font-bold mt-6">Responsibilities</h3>
+            <h3 class="text-lg font-bold mt-6">{{ t('jobs.responsibilities') }}</h3>
             <ul class="list-disc list-inside mt-2">
                 {% for responsibility in job.responsibilities %}
                 <li>{{ responsibility }}</li>
@@ -51,7 +54,7 @@
             {% endif %}
             
             {% if job.qualifications %}
-            <h3 class="text-lg font-bold mt-6">Qualifications</h3>
+            <h3 class="text-lg font-bold mt-6">{{ t('jobs.qualifications') }}</h3>
             <ul class="list-disc list-inside mt-2">
                 {% for qualification in job.qualifications %}
                 <li>{{ qualification }}</li>
@@ -65,24 +68,24 @@
     <div class="space-y-6">
         <div class="card bg-base-100 shadow-xl">
             <div class="card-body">
-                <h2 class="card-title">Job Details</h2>
+                <h2 class="card-title">{{ t('jobs.job_details') }}</h2>
                 <div class="overflow-x-auto">
                     <table class="table">
                         <tbody>
                             <tr>
-                                <td class="font-medium">Posted Date</td>
+                                <td class="font-medium">{{ t('jobs.posted_date') }}</td>
                                 <td>{{ job.created_at.strftime('%Y-%m-%d') }}</td>
                             </tr>
                             <tr>
-                                <td class="font-medium">Last Updated</td>
+                                <td class="font-medium">{{ t('jobs.last_updated') }}</td>
                                 <td>{{ job.updated_at.strftime('%Y-%m-%d') if job.updated_at else job.created_at.strftime('%Y-%m-%d') }}</td>
                             </tr>
                             <tr>
-                                <td class="font-medium">Required Skills</td>
+                                <td class="font-medium">{{ t('jobs.required_skills_count') }}</td>
                                 <td>{{ job.required_skills|length }}</td>
                             </tr>
                             <tr>
-                                <td class="font-medium">Preferred Skills</td>
+                                <td class="font-medium">{{ t('jobs.preferred_skills_count') }}</td>
                                 <td>{{ job.preferred_skills|length }}</td>
                             </tr>
                         </tbody>
@@ -91,7 +94,7 @@
                 
                 {% if not user.is_recruiter and not user_applications %}
                 <div class="card-actions justify-center mt-4">
-                    <button class="btn btn-primary w-full" onclick="document.getElementById('apply-modal').showModal()">Apply Now</button>
+                    <button type="button" class="btn btn-primary w-full" onclick="document.getElementById('apply-modal').showModal()">{{ t('jobs.apply_now') }}</button>
                 </div>
                 {% endif %}
             </div>
@@ -100,15 +103,15 @@
         {% if user.is_recruiter and job.company_id == user.id and applications %}
         <div class="card bg-base-100 shadow-xl">
             <div class="card-body">
-                <h2 class="card-title">Applications ({{ applications|length }})</h2>
+                <h2 class="card-title">{{ t('jobs.applications_count') }} ({{ applications|length }})</h2>
                 
                 <div class="overflow-x-auto">
                     <table class="table table-zebra">
                         <thead>
                             <tr>
-                                <th>Name</th>
-                                <th>Match</th>
-                                <th>Status</th>
+                                <th>{{ t('common.name') }}</th>
+                                <th>{{ t('applications.match_score') }}</th>
+                                <th>{{ t('common.status') }}</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -121,11 +124,11 @@
                                 </td>
                                 <td>
                                     <span class="badge {% if app.status == 'Shortlisted' %}badge-success{% elif app.status == 'Rejected' %}badge-error{% else %}badge-info{% endif %}">
-                                        {{ app.status }}
+                                        {{ t('status.' ~ app.status|lower) }}
                                     </span>
                                 </td>
                                 <td>
-                                    <a href="/applications/{{ app.id }}" class="btn btn-xs btn-outline">View</a>
+                                    <a href="/applications/{{ app.id }}" class="btn btn-xs btn-outline">{{ t('common.view') }}</a>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -142,16 +145,16 @@
 {% if not user.is_recruiter and resumes %}
 <dialog id="apply-modal" class="modal">
     <div class="modal-box">
-        <h3 class="font-bold text-lg">Apply for {{ job.title }}</h3>
+        <h3 class="font-bold text-lg">{{ t('jobs.apply_now') }}: {{ job.title }}</h3>
         <form method="post" action="/applications/create" class="mt-4">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
             <input type="hidden" name="job_id" value="{{ job.id }}" />
             <div class="form-control">
-                <label class="label">
-                    <span class="label-text">Select Resume</span>
+                <label class="label" for="resume_id">
+                    <span class="label-text">{{ t('jobs.select_resume') }}</span>
                 </label>
-                <select name="resume_id" class="select select-bordered" required>
-                    <option value="" disabled selected>Choose a resume</option>
+                <select id="resume_id" name="resume_id" class="select select-bordered" required>
+                    <option value="" disabled selected>{{ t('jobs.choose_resume') }}</option>
                     {% for resume in resumes %}
                     <option value="{{ resume.id }}">Resume #{{ resume.id }} - {{ resume.created_at.strftime('%Y-%m-%d') }}</option>
                     {% endfor %}
@@ -159,13 +162,13 @@
             </div>
             
             <div class="modal-action">
-                <button type="submit" class="btn btn-primary">Submit Application</button>
-                <button type="button" class="btn" onclick="document.getElementById('apply-modal').close()">Cancel</button>
+                <button type="submit" class="btn btn-primary">{{ t('jobs.submit_application') }}</button>
+                <button type="button" class="btn" onclick="document.getElementById('apply-modal').close()">{{ t('common.cancel') }}</button>
             </div>
         </form>
     </div>
     <form method="dialog" class="modal-backdrop">
-        <button>close</button>
+        <button>{{ t('common.close') }}</button>
     </form>
 </dialog>
 {% endif %}

@@ -1,31 +1,31 @@
 {% extends "base.html" %}
 
-{% block title %}Create Job - {{ app_name }}{% endblock %}
+{% block title %}{{ t('jobs.create') }} - {{ app_name }}{% endblock %}
 
 {% block content %}
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-        <h2 class="card-title">Post New Job</h2>
+        <h2 class="card-title">{{ t('jobs.post_new') }}</h2>
         
         <form method="post" action="/jobs/create">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
             <div class="form-control">
-                <label class="label">
-                    <span class="label-text">Job Title</span>
+                <label class="label" for="job-title">
+                    <span class="label-text">{{ t('jobs.title_label') }}</span>
                 </label>
-                <input type="text" name="title" placeholder="e.g., Senior Software Engineer" class="input input-bordered" value="{{ title or '' }}" required />
+                <input id="job-title" type="text" name="title" placeholder="e.g., Senior Software Engineer" class="input input-bordered" value="{{ title or '' }}" required />
             </div>
             
             <div class="form-control mt-4">
-                <label class="label">
-                    <span class="label-text">Job Description</span>
-                    <span class="label-text-alt">Include details about requirements, responsibilities, and qualifications</span>
+                <label class="label" for="job-description">
+                    <span class="label-text">{{ t('jobs.description') }}</span>
+                    <span class="label-text-alt">{{ t('jobs.description_help') }}</span>
                 </label>
-                <textarea name="description_text" class="textarea textarea-bordered h-64" placeholder="Full job description..." required>{{ description_text or '' }}</textarea>
+                <textarea id="job-description" name="description_text" class="textarea textarea-bordered h-64" placeholder="Full job description..." required>{{ description_text or '' }}</textarea>
             </div>
             
             <div class="form-control mt-6">
-                <button type="submit" class="btn btn-primary">Create Job</button>
+                <button type="submit" class="btn btn-primary">{{ t('jobs.create_submit') }}</button>
             </div>
         </form>
     </div>

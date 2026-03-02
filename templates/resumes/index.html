@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Resumes - {{ app_name }}{% endblock %}
+{% block title %}{{ t('resumes.title') }} - {{ app_name }}{% endblock %}
 
 {% block content %}
 <div class="flex justify-between items-center mb-6">
-    <h1 class="text-2xl font-bold">Your Resumes</h1>
-    <a href="/resumes/create" class="btn btn-primary">Upload Resume</a>
+    <h1 class="text-2xl font-bold">{{ t('resumes.your_resumes') }}</h1>
+    <a href="/resumes/create" class="btn btn-primary">{{ t('resumes.upload') }}</a>
 </div>
 
 {% if resumes %}
@@ -14,23 +14,23 @@
         <thead>
             <tr>
                 <th>ID</th>
-                <th>Name</th>
-                <th>Skills</th>
-                <th>Experience</th>
-                <th>Date</th>
-                <th>Actions</th>
+                <th>{{ t('common.name') }}</th>
+                <th>{{ t('resumes.skills') }}</th>
+                <th>{{ t('resumes.experience') }}</th>
+                <th>{{ t('common.date') }}</th>
+                <th>{{ t('applications.actions') }}</th>
             </tr>
         </thead>
         <tbody>
             {% for resume in resumes %}
             <tr class="hover">
                 <td>{{ resume.id }}</td>
-                <td>{{ resume.parsed_sections.get('contact', {}).get('name', 'Unnamed Resume') }}</td>
-                <td>{{ resume.skills|length if resume.skills else 0 }} skills</td>
-                <td>{{ resume.experience|length if resume.experience else 0 }} entries</td>
+                <td>{{ resume.parsed_sections.get('contact', {}).get('name', t('resumes.unnamed')) }}</td>
+                <td>{{ resume.skills|length if resume.skills else 0 }} {{ t('resumes.skills_suffix') }}</td>
+                <td>{{ resume.experience|length if resume.experience else 0 }} {{ t('resumes.entries_suffix') }}</td>
                 <td>{{ resume.created_at.strftime('%Y-%m-%d') }}</td>
                 <td>
-                    <a href="/resumes/{{ resume.id }}" class="btn btn-xs btn-outline">View</a>
+                    <a href="/resumes/{{ resume.id }}" class="btn btn-xs btn-outline">{{ t('common.view') }}</a>
                 </td>
             </tr>
             {% endfor %}
@@ -40,10 +40,10 @@
 {% else %}
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-        <h2 class="card-title">No Resumes Found</h2>
-        <p>You haven't uploaded any resumes yet. Get started by uploading your first resume.</p>
+        <h2 class="card-title">{{ t('resumes.no_resumes_found') }}</h2>
+        <p>{{ t('resumes.no_resumes_desc') }}</p>
         <div class="card-actions justify-end mt-4">
-            <a href="/resumes/create" class="btn btn-primary">Upload Resume</a>
+            <a href="/resumes/create" class="btn btn-primary">{{ t('resumes.upload') }}</a>
         </div>
     </div>
 </div>

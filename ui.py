@@ -1,5 +1,5 @@
-from datetime import datetime, timedelta
-from typing import Annotated
+from datetime import UTC, datetime, timedelta
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -13,6 +13,7 @@ from core.security import (
     create_access_token,
     create_csrf_token,
     decode_access_token,
+    get_password_hash,
     verify_csrf_token,
     verify_password,
 )
@@ -23,6 +24,7 @@ from services import job_service, matching_service, resume_service, user_service
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
+
 
 # Helper for template context
 async def get_user_context(request: Request, current_user: User | None = None):
@@ -36,7 +38,7 @@ async def get_user_context(request: Request, current_user: User | None = None):
         "request": request,
         "user": current_user,
         "app_name": settings.PROJECT_NAME,
-        "now": datetime.now(),
+        "now": datetime.now(UTC),
         "locale": locale,
         "supported_locales": settings.SUPPORTED_LOCALES,
         "csrf_token": csrf_token,
@@ -48,9 +50,9 @@ def validate_csrf_or_400(current_user: User, csrf_token: str):
     if not verify_csrf_token(csrf_token, current_user.id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid CSRF token")
 
+
 async def get_optional_user(
-    request: Request,
-    db: Annotated[AsyncSession, Depends(get_db)]
+    request: Request, db: Annotated[AsyncSession, Depends(get_db)]
 ) -> User | None:
     token = request.cookies.get(settings.AUTH_COOKIE_NAME)
     if not token:
@@ -69,12 +71,14 @@ async def get_optional_user(
     except Exception:
         return None
 
+
 # Home page
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request, current_user: Annotated[User | None, Depends(get_optional_user)]):
     context = await get_user_context(request, current_user)
     context["active_page"] = "home"
     return templates.TemplateResponse("index.html", context)
+
 
 # Auth routes
 @router.get("/login", response_class=HTMLResponse)
@@ -83,22 +87,23 @@ async def login_page(request: Request):
     context["active_page"] = "login"
     return templates.TemplateResponse("auth/login.html", context)
 
+
 @router.post("/login")
 async def login_submit(
     request: Request,
-    db: AsyncSession = Depends(get_db), 
-    email: str = Form(...), 
-    password: str = Form(...)
+    db: AsyncSession = Depends(get_db),
+    email: str = Form(...),
+    password: str = Form(...),
 ):
     user = await user_service.get_user_by_email(db, email)
     if not user or not user.is_active or not verify_password(password, user.hashed_password):
         context = await get_user_context(request)
         context["error"] = "Invalid email or password"
         return templates.TemplateResponse("auth/login.html", context, status_code=400)
-    
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(user.id, expires_delta=access_token_expires)
-    
+
     response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(
         key=settings.AUTH_COOKIE_NAME,
@@ -110,11 +115,13 @@ async def login_submit(
     )
     return response
 
+
 @router.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
     context = await get_user_context(request)
     context["active_page"] = "register"
     return templates.TemplateResponse("auth/register.html", context)
+
 
 @router.post("/register")
 async def register_submit(
@@ -123,25 +130,21 @@ async def register_submit(
     email: str = Form(...),
     full_name: str = Form(...),
     password: str = Form(...),
-    is_recruiter: bool = Form(False)
+    is_recruiter: bool = Form(False),
 ):
     user = await user_service.get_user_by_email(db, email)
     if user:
         context = await get_user_context(request)
         context["error"] = "Email already registered"
         return templates.TemplateResponse("auth/register.html", context, status_code=400)
-    
-    user_data = {
-        "email": email,
-        "full_name": full_name,
-        "is_recruiter": is_recruiter
-    }
-    
-    from core.security import get_password_hash
+
+    user_data = {"email": email, "full_name": full_name, "is_recruiter": is_recruiter}
+
     hashed_password = get_password_hash(password)
     await user_service.create_user(db, user_data, hashed_password)
-    
+
     return RedirectResponse(url="/login?registered=true", status_code=status.HTTP_303_SEE_OTHER)
+
 
 @router.get("/logout")
 async def logout():
@@ -164,58 +167,68 @@ async def set_locale(locale: str = Form(...), redirect_to: str = Form("/")):
     )
     return response
 
+
 # Dashboard routes
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(
-    request: Request, 
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     context = await get_user_context(request, current_user)
     context["active_page"] = "dashboard"
-    
+
     if current_user.is_recruiter:
         # Recruiter dashboard
         jobs = await job_service.get_jobs(db, current_user.id, current_user.is_recruiter, limit=5)
-        applications = await matching_service.get_applications(db, current_user.id, current_user.is_recruiter, limit=10)
-        
+        applications = await matching_service.get_applications(
+            db, current_user.id, current_user.is_recruiter, limit=10
+        )
+
         context["jobs"] = jobs
         context["applications"] = applications
         context["stats"] = {
             "jobs_count": len(jobs),
             "new_applications": sum(1 for app in applications if app.status == "New"),
-            "shortlisted": sum(1 for app in applications if app.status == "Shortlisted")
+            "shortlisted": sum(1 for app in applications if app.status == "Shortlisted"),
         }
-        
+
         return templates.TemplateResponse("dashboard/recruiter.html", context)
     else:
         # Job seeker dashboard
-        resumes = await resume_service.get_resumes(db, current_user.id, current_user.is_recruiter, limit=5)
-        applications = await matching_service.get_applications(db, current_user.id, current_user.is_recruiter, limit=10)
+        resumes = await resume_service.get_resumes(
+            db, current_user.id, current_user.is_recruiter, limit=5
+        )
+        applications = await matching_service.get_applications(
+            db, current_user.id, current_user.is_recruiter, limit=10
+        )
         jobs = await job_service.get_jobs(db, current_user.id, current_user.is_recruiter, limit=5)
-        
+
         context["resumes"] = resumes
         context["applications"] = applications
         context["jobs"] = jobs
         context["stats"] = {
             "resumes_count": len(resumes),
             "applications_count": len(applications),
-            "pending_applications": sum(1 for app in applications if app.status == "New")
+            "pending_applications": sum(1 for app in applications if app.status == "New"),
         }
-        
+
         if resumes:
             # Get job recommendations for the first resume
-            recommendations = await job_service.get_jobs(db, current_user.id, current_user.is_recruiter, limit=3)
+            recommendations = await job_service.get_jobs(
+                db, current_user.id, current_user.is_recruiter, limit=3
+            )
             context["recommendations"] = recommendations
-        
+
         return templates.TemplateResponse("dashboard/jobseeker.html", context)
+
 
 # Resume routes
 @router.get("/resumes", response_class=HTMLResponse)
 async def resumes(
-    request: Request, 
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     context = await get_user_context(request, current_user)
     context["active_page"] = "resumes"
@@ -223,11 +236,13 @@ async def resumes(
     context["resumes"] = resumes
     return templates.TemplateResponse("resumes/index.html", context)
 
+
 @router.get("/resumes/create", response_class=HTMLResponse)
 async def create_resume_page(request: Request, current_user: User = Depends(get_current_user)):
     context = await get_user_context(request, current_user)
     context["active_page"] = "resumes"
     return templates.TemplateResponse("resumes/create.html", context)
+
 
 @router.post("/resumes/create")
 async def create_resume_submit(
@@ -244,13 +259,13 @@ async def create_resume_submit(
         context = await get_user_context(request, current_user)
         context["error"] = "Either file or text must be provided"
         return templates.TemplateResponse("resumes/create.html", context, status_code=400)
-    
+
     try:
         if resume_file:
             result = await resume_service.process_resume_file(resume_file)
         else:
             result = await resume_service.process_resume_text(resume_text)
-        
+
         resume = await resume_service.create_resume(db, current_user.id, result)
         return RedirectResponse(url=f"/resumes/{resume.id}", status_code=status.HTTP_303_SEE_OTHER)
     except Exception as e:
@@ -258,37 +273,38 @@ async def create_resume_submit(
         context["error"] = f"Error processing resume: {str(e)}"
         return templates.TemplateResponse("resumes/create.html", context, status_code=400)
 
+
 @router.get("/resumes/{id}", response_class=HTMLResponse)
 async def resume_detail(
     request: Request,
     id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     resume = await resume_service.get_resume(db, id)
     if not resume:
         return RedirectResponse(url="/resumes", status_code=status.HTTP_303_SEE_OTHER)
-    
+
     if not current_user.is_recruiter and resume.user_id != current_user.id:
         return RedirectResponse(url="/resumes", status_code=status.HTTP_303_SEE_OTHER)
-    
+
     context = await get_user_context(request, current_user)
     context["active_page"] = "resumes"
     context["resume"] = resume
-    
+
     # Get improvement suggestions
     improvement = await job_service.get_resume_improvement(id, db, current_user)
     context["improvement"] = improvement
-    
+
     # Get quality score
     quality_score = await job_service.get_resume_quality_score(id, db, current_user)
     context["quality_score"] = quality_score
-    
+
     # Get job recommendations if not recruiter
     if not current_user.is_recruiter:
         recommendations = await job_service.get_recommendations(resume.id, db, current_user)
         context["recommendations"] = recommendations
-    
+
     return templates.TemplateResponse("resumes/detail.html", context)
 
 
@@ -311,12 +327,13 @@ async def delete_resume_submit(
     await resume_service.delete_resume(db, id)
     return RedirectResponse(url="/resumes", status_code=status.HTTP_303_SEE_OTHER)
 
+
 # Job routes
 @router.get("/jobs", response_class=HTMLResponse)
 async def jobs(
-    request: Request, 
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     context = await get_user_context(request, current_user)
     context["active_page"] = "jobs"
@@ -324,14 +341,16 @@ async def jobs(
     context["jobs"] = jobs
     return templates.TemplateResponse("jobs/index.html", context)
 
+
 @router.get("/jobs/create", response_class=HTMLResponse)
 async def create_job_page(request: Request, current_user: User = Depends(get_current_user)):
     if not current_user.is_recruiter:
         return RedirectResponse(url="/jobs", status_code=status.HTTP_303_SEE_OTHER)
-    
+
     context = await get_user_context(request, current_user)
     context["active_page"] = "jobs"
     return templates.TemplateResponse("jobs/create.html", context)
+
 
 @router.post("/jobs/create")
 async def create_job_submit(
@@ -346,10 +365,12 @@ async def create_job_submit(
 
     if not current_user.is_recruiter:
         return RedirectResponse(url="/jobs", status_code=status.HTTP_303_SEE_OTHER)
-    
+
     try:
         result = await job_service.process_job_description(description_text)
-        job = await job_service.create_job(db, current_user.id, result, {"title": title, "description_text": description_text})
+        job = await job_service.create_job(
+            db, current_user.id, result, {"title": title, "description_text": description_text}
+        )
         return RedirectResponse(url=f"/jobs/{job.id}", status_code=status.HTTP_303_SEE_OTHER)
     except Exception as e:
         context = await get_user_context(request, current_user)
@@ -358,57 +379,160 @@ async def create_job_submit(
         context["description_text"] = description_text
         return templates.TemplateResponse("jobs/create.html", context, status_code=400)
 
+
 @router.get("/jobs/{id}", response_class=HTMLResponse)
 async def job_detail(
     request: Request,
     id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     job = await job_service.get_job(db, id)
     if not job:
         return RedirectResponse(url="/jobs", status_code=status.HTTP_303_SEE_OTHER)
-    
+
     context = await get_user_context(request, current_user)
     context["active_page"] = "jobs"
     context["job"] = job
-    
+
     # Get applications if recruiter and this is their job
     if current_user.is_recruiter and job.company_id == current_user.id:
         applications = await matching_service.get_applications(db, current_user.id, True, job.id)
         context["applications"] = applications
-    
+
     # Get resumes if job seeker for applying
     if not current_user.is_recruiter:
         resumes = await resume_service.get_resumes(db, current_user.id, False)
         context["resumes"] = resumes
-        
+
         # Check if user already applied
         applications = await matching_service.get_applications(db, current_user.id, False, job.id)
         context["user_applications"] = applications
-    
+
     return templates.TemplateResponse("jobs/detail.html", context)
+
+
+@router.get("/jobs/{id}/edit", response_class=HTMLResponse)
+async def edit_job_page(
+    request: Request,
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not current_user.is_recruiter:
+        return RedirectResponse(url="/jobs", status_code=status.HTTP_303_SEE_OTHER)
+
+    job = await job_service.get_job(db, id)
+    if not job or job.company_id != current_user.id:
+        return RedirectResponse(url="/jobs", status_code=status.HTTP_303_SEE_OTHER)
+
+    context = await get_user_context(request, current_user)
+    context["active_page"] = "jobs"
+    context["job"] = job
+    return templates.TemplateResponse("jobs/edit.html", context)
+
+
+@router.post("/jobs/{id}/edit")
+async def edit_job_submit(
+    request: Request,
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    title: str = Form(...),
+    description_text: str = Form(...),
+    csrf_token: str = Form(...),
+):
+    validate_csrf_or_400(current_user, csrf_token)
+
+    if not current_user.is_recruiter:
+        return RedirectResponse(url="/jobs", status_code=status.HTTP_303_SEE_OTHER)
+
+    job = await job_service.get_job(db, id)
+    if not job or job.company_id != current_user.id:
+        return RedirectResponse(url="/jobs", status_code=status.HTTP_303_SEE_OTHER)
+
+    try:
+        result = await job_service.process_job_description(description_text)
+        update_data = {
+            "title": title,
+            "description_text": description_text,
+            "required_skills": result.get("required_skills", []),
+            "preferred_skills": result.get("preferred_skills", []),
+            "responsibilities": result.get("responsibilities", []),
+            "qualifications": result.get("qualifications", []),
+        }
+        await job_service.update_job(db, id, update_data)
+        return RedirectResponse(url=f"/jobs/{id}", status_code=status.HTTP_303_SEE_OTHER)
+    except Exception as e:
+        context = await get_user_context(request, current_user)
+        context["error"] = f"Error updating job: {e!s}"
+        context["job"] = job
+        context["title"] = title
+        context["description_text"] = description_text
+        return templates.TemplateResponse("jobs/edit.html", context, status_code=400)
+
+
+@router.post("/jobs/{id}/delete")
+async def delete_job_submit(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    csrf_token: str = Form(...),
+):
+    validate_csrf_or_400(current_user, csrf_token)
+
+    if not current_user.is_recruiter:
+        return RedirectResponse(url="/jobs", status_code=status.HTTP_303_SEE_OTHER)
+
+    job = await job_service.get_job(db, id)
+    if not job or job.company_id != current_user.id:
+        return RedirectResponse(url="/jobs", status_code=status.HTTP_303_SEE_OTHER)
+
+    await job_service.delete_job(db, id)
+    return RedirectResponse(url="/jobs", status_code=status.HTTP_303_SEE_OTHER)
+
 
 # Application routes
 @router.get("/applications", response_class=HTMLResponse)
 async def applications(
-    request: Request, 
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     context = await get_user_context(request, current_user)
     context["active_page"] = "applications"
-    applications = await matching_service.get_applications(db, current_user.id, current_user.is_recruiter)
-    
-    # Get additional data for display
+    applications = await matching_service.get_applications(
+        db, current_user.id, current_user.is_recruiter
+    )
+
+    # Batch-fetch jobs and resumes to avoid N+1 queries
+    job_ids = {app.job_id for app in applications}
+    resume_ids = {app.resume_id for app in applications}
+
+    jobs_map: dict[int, Any] = {}
+    resumes_map: dict[int, Any] = {}
+    for jid in job_ids:
+        j = await job_service.get_job(db, jid)
+        if j:
+            jobs_map[jid] = j
+    for rid in resume_ids:
+        r = await resume_service.get_resume(db, rid)
+        if r:
+            resumes_map[rid] = r
+
     for app in applications:
-        job = await job_service.get_job(db, app.job_id)
-        resume = await resume_service.get_resume(db, app.resume_id)
+        job = jobs_map.get(app.job_id)
+        resume = resumes_map.get(app.resume_id)
         app.job_title = job.title if job else "Unknown Job"
-        app.resume_name = resume.parsed_sections.get("contact", {}).get("name", "Unnamed Resume") if resume else "Unknown Resume"
-    
+        app.resume_name = (
+            resume.parsed_sections.get("contact", {}).get("name", "Unnamed Resume")
+            if resume
+            else "Unknown Resume"
+        )
+
     context["applications"] = applications
     return templates.TemplateResponse("applications/index.html", context)
+
 
 @router.post("/applications/create")
 async def create_application(
@@ -423,35 +547,37 @@ async def create_application(
 
     if current_user.is_recruiter:
         return RedirectResponse(url="/jobs", status_code=status.HTTP_303_SEE_OTHER)
-    
+
     # Check if job and resume exist
     job = await job_service.get_job(db, job_id)
     resume = await resume_service.get_resume(db, resume_id)
-    
+
     if not job or not resume:
         return RedirectResponse(url="/jobs", status_code=status.HTTP_303_SEE_OTHER)
-    
+
     if resume.user_id != current_user.id:
         return RedirectResponse(url="/jobs", status_code=status.HTTP_303_SEE_OTHER)
-    
+
     # Check if already applied
     applications = await matching_service.get_applications(db, current_user.id, False, job_id)
     for app in applications:
         if app.resume_id == resume_id:
-            return RedirectResponse(url=f"/jobs/{job_id}?already_applied=true", status_code=status.HTTP_303_SEE_OTHER)
-    
+            return RedirectResponse(
+                url=f"/jobs/{job_id}?already_applied=true", status_code=status.HTTP_303_SEE_OTHER
+            )
+
     # Get user information from resume
     contact_info = resume.parsed_sections.get("contact", {})
-    
+
     # Create application
     application_data = {
         "job_id": job_id,
         "resume_id": resume_id,
         "full_name": contact_info.get("name", current_user.full_name),
         "email": contact_info.get("email", current_user.email),
-        "phone": contact_info.get("phone", "")
+        "phone": contact_info.get("phone", ""),
     }
-    
+
     # Match resume to job
     score, match_details, feedback = await matching_service.match_resume_to_job(
         resume.parsed_sections,
@@ -460,31 +586,37 @@ async def create_application(
             "required_skills": job.required_skills,
             "preferred_skills": job.preferred_skills,
             "responsibilities": job.responsibilities,
-            "qualifications": job.qualifications
-        }
+            "qualifications": job.qualifications,
+        },
     )
-    
-    application = await matching_service.create_application(db, application_data, score, match_details, feedback)
-    return RedirectResponse(url=f"/applications/{application.id}", status_code=status.HTTP_303_SEE_OTHER)
+
+    application = await matching_service.create_application(
+        db, application_data, score, match_details, feedback
+    )
+    return RedirectResponse(
+        url=f"/applications/{application.id}", status_code=status.HTTP_303_SEE_OTHER
+    )
+
 
 @router.get("/applications/{id}", response_class=HTMLResponse)
 async def application_detail(
     request: Request,
     id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     application_data = await matching_service.get_application(db, id)
     if not application_data:
         return RedirectResponse(url="/applications", status_code=status.HTTP_303_SEE_OTHER)
-    
+
     application, job, resume = application_data
-    
+
     # Check permissions
-    if (current_user.is_recruiter and job.company_id != current_user.id) or \
-       (not current_user.is_recruiter and resume.user_id != current_user.id):
+    if (current_user.is_recruiter and job.company_id != current_user.id) or (
+        not current_user.is_recruiter and resume.user_id != current_user.id
+    ):
         return RedirectResponse(url="/applications", status_code=status.HTTP_303_SEE_OTHER)
-    
+
     context = await get_user_context(request, current_user)
     context["active_page"] = "applications"
     context["application"] = application
@@ -493,8 +625,9 @@ async def application_detail(
     context["match_score"] = application.match_score
     context["match_details"] = application.match_details
     context["feedback"] = application.feedback
-    
+
     return templates.TemplateResponse("applications/detail.html", context)
+
 
 @router.post("/applications/{id}/update-status")
 async def update_application_status(
@@ -508,37 +641,59 @@ async def update_application_status(
 
     if not current_user.is_recruiter:
         return RedirectResponse(url="/applications", status_code=status.HTTP_303_SEE_OTHER)
-    
+
     application_data = await matching_service.get_application(db, id)
     if not application_data:
         return RedirectResponse(url="/applications", status_code=status.HTTP_303_SEE_OTHER)
-    
+
     application, job, _ = application_data
-    
+
     if job.company_id != current_user.id:
         return RedirectResponse(url="/applications", status_code=status.HTTP_303_SEE_OTHER)
-    
+
     valid_statuses = ["New", "Reviewed", "Shortlisted", "Rejected"]
     if status_value not in valid_statuses:
         return RedirectResponse(url=f"/applications/{id}", status_code=status.HTTP_303_SEE_OTHER)
-    
+
     await matching_service.update_application_status(db, id, status_value)
     return RedirectResponse(url=f"/applications/{id}", status_code=status.HTTP_303_SEE_OTHER)
+
 
 # Analysis routes
 @router.get("/analysis", response_class=HTMLResponse)
 async def market_analysis(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     if not current_user.is_recruiter:
         return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-    
+
     context = await get_user_context(request, current_user)
     context["active_page"] = "analysis"
-    
+
     analysis = await job_service.get_market_analysis(db, current_user)
     context["analysis"] = analysis
-    
+
     return templates.TemplateResponse("analysis/index.html", context)
+
+
+# Skills Gap Analysis routes
+@router.get("/skills-gap", response_class=HTMLResponse)
+async def skills_gap(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.is_recruiter:
+        return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+
+    context = await get_user_context(request, current_user)
+    context["active_page"] = "skills_gap"
+
+    resumes = await resume_service.get_resumes(db, current_user.id, False)
+    jobs = await job_service.get_jobs(db, current_user.id, False)
+    context["resumes"] = resumes
+    context["jobs"] = jobs
+
+    return templates.TemplateResponse("skills_gap/index.html", context)

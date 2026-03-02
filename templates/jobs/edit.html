@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('jobs.edit') }} - {{ job.title }} - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <h2 class="card-title">{{ t('jobs.edit') }}: {{ job.title }}</h2>
+        
+        <form method="post" action="/jobs/{{ job.id }}/edit">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <div class="form-control">
+                <label class="label" for="job-title">
+                    <span class="label-text">{{ t('jobs.title_label') }}</span>
+                </label>
+                <input id="job-title" type="text" name="title" placeholder="e.g., Senior Software Engineer" class="input input-bordered" value="{{ title or job.title }}" required />
+            </div>
+            
+            <div class="form-control mt-4">
+                <label class="label" for="job-description">
+                    <span class="label-text">{{ t('jobs.description') }}</span>
+                    <span class="label-text-alt">{{ t('jobs.description_help') }}</span>
+                </label>
+                <textarea id="job-description" name="description_text" class="textarea textarea-bordered h-64" placeholder="Full job description..." required>{{ description_text or job.description_text }}</textarea>
+            </div>
+            
+            <div class="flex gap-4 mt-6">
+                <button type="submit" class="btn btn-primary">{{ t('jobs.edit_submit') }}</button>
+                <a href="/jobs/{{ job.id }}" class="btn btn-ghost">{{ t('common.cancel') }}</a>
+            </div>
+        </form>
+        
+        <!-- Delete Job -->
+        <div class="divider"></div>
+        <div class="flex justify-end">
+            <form method="post" action="/jobs/{{ job.id }}/delete" onsubmit="return confirm('{{ t('jobs.delete_confirm') }}');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <button type="submit" class="btn btn-error btn-outline">{{ t('jobs.delete') }}</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

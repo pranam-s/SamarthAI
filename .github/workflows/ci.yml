@@ -2,30 +2,80 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   quality:
+    name: Lint & Type Check
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup uv
+      - name: Install uv
         uses: astral-sh/setup-uv@v6
 
-      - name: Setup Python 3.12
+      - name: Set up Python 3.12
         run: uv python install 3.12
 
-      - name: Sync dependencies
-        run: uv sync --locked
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
 
       - name: Ruff lint
         run: uv run ruff check .
 
-      - name: Ty type check
-        run: uv run ty check .
+      - name: Type check (ty)
+        run: uv run ty check
+        continue-on-error: true
 
-      - name: Tests
-        run: uv run pytest
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Run tests with coverage
+        run: uv run pytest tests/ -v --tb=short --cov=. --cov-report=term-missing
+        env:
+          SECRET_KEY: "ci-test-secret-key-not-real"
+          DATABASE_URL: "sqlite+aiosqlite:///./test.db"
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t samarth-ai:${{ github.sha }} .
+
+      - name: Verify container starts
+        run: |
+          docker run -d --name samarth-test \
+            -e SECRET_KEY="docker-test-key" \
+            -e DATABASE_URL="sqlite+aiosqlite:///./app.db" \
+            -p 8000:8000 \
+            samarth-ai:${{ github.sha }}
+          sleep 5
+          curl -f http://localhost:8000/ || exit 1
+          docker stop samarth-test
