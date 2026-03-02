@@ -38,11 +38,11 @@ class TestAccessToken:
         assert payload["exp"] > time.time()
 
     def test_expired_token_raises(self) -> None:
+        import jwt as pyjwt
         import pytest
-        from jose import ExpiredSignatureError
 
         token = create_access_token(subject=1, expires_delta=timedelta(seconds=-1))
-        with pytest.raises(ExpiredSignatureError):
+        with pytest.raises(pyjwt.ExpiredSignatureError):
             decode_access_token(token)
 
 

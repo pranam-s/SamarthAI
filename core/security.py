@@ -2,8 +2,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
+import jwt
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
-from jose import jwt
 
 from core.config import settings
 
