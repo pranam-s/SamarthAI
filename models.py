@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.database import Base
@@ -14,6 +14,10 @@ class User(Base):
     email: Mapped[str] = mapped_column(String, unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String)
     full_name: Mapped[str] = mapped_column(String, default="")
+    phone: Mapped[str | None] = mapped_column(String, default=None)
+    bio: Mapped[str | None] = mapped_column(Text, default=None)
+    location: Mapped[str | None] = mapped_column(String, default=None)
+    profile_picture_url: Mapped[str | None] = mapped_column(String, default=None)
     is_recruiter: Mapped[bool] = mapped_column(default=False)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -58,6 +62,16 @@ class Job(Base):
     company_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     title: Mapped[str] = mapped_column(String, index=True)
     description_text: Mapped[str | None] = mapped_column(Text, default=None)
+    location: Mapped[str | None] = mapped_column(String, default=None)
+    salary_min: Mapped[int | None] = mapped_column(Integer, default=None)
+    salary_max: Mapped[int | None] = mapped_column(Integer, default=None)
+    job_type: Mapped[str | None] = mapped_column(
+        String, default=None
+    )  # full-time/part-time/contract/internship
+    is_remote: Mapped[bool] = mapped_column(Boolean, default=False)
+    experience_level: Mapped[str | None] = mapped_column(
+        String, default=None
+    )  # entry/mid/senior/lead
     required_skills: Mapped[list[Any] | None] = mapped_column(JSON, default=None)
     preferred_skills: Mapped[list[Any] | None] = mapped_column(JSON, default=None)
     responsibilities: Mapped[list[Any] | None] = mapped_column(JSON, default=None)
@@ -81,6 +95,7 @@ class Application(Base):
     full_name: Mapped[str] = mapped_column(String)
     email: Mapped[str] = mapped_column(String)
     phone: Mapped[str | None] = mapped_column(String, default=None)
+    cover_letter: Mapped[str | None] = mapped_column(Text, default=None)
     match_score: Mapped[float] = mapped_column(default=0.0)
     match_details: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
     feedback: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)

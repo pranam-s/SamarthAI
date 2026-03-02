@@ -66,7 +66,20 @@ async def get_current_user(
             detail="Could not validate credentials",
         ) from err
 
-    user = await user_service.get_user_by_id(db, token_data.sub)
+    if token_data.sub is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not validate credentials",
+        )
+    try:
+        user_id = int(token_data.sub)
+    except (ValueError, TypeError) as err:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not validate credentials",
+        ) from err
+
+    user = await user_service.get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -119,6 +132,14 @@ async def register_user(user_in: UserCreate, db: Annotated[AsyncSession, Depends
     hashed_password = get_password_hash(user_in.password)
     user = await user_service.create_user(db, user_data, hashed_password)
     return user
+
+
+@router.get("/auth/me", response_model=UserSchema)
+async def get_current_user_profile(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> Any:
+    """Return the profile of the currently authenticated user."""
+    return current_user
 
 
 @router.post("/resumes", response_model=Resume)

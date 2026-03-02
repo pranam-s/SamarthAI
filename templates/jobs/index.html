@@ -2,6 +2,10 @@
 
 {% block title %}{{ t('jobs.title') }} - {{ app_name }}{% endblock %}
 
+{% block meta_description %}Browse open job listings on {{ app_name }}. Find your next career opportunity — filter by location, job type, and experience level.{% endblock %}
+{% block og_title_inner %}{{ t('jobs.title') }} — {{ app_name }}{% endblock %}
+{% block og_description %}Browse open job listings on {{ app_name }}. Find your next career opportunity.{% endblock %}
+
 {% block content %}
 <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold">{{ t('jobs.title') }}</h1>

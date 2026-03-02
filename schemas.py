@@ -1,11 +1,11 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 class TokenPayload(BaseModel):
-    sub: int | None = None
+    sub: str | None = None
 
 
 class Token(BaseModel):
@@ -17,6 +17,10 @@ class UserBase(BaseModel):
     email: EmailStr
     full_name: str | None = None
     is_recruiter: bool = False
+    phone: str | None = None
+    bio: str | None = None
+    location: str | None = None
+    profile_picture_url: str | None = None
 
 
 class UserCreate(UserBase):
@@ -25,6 +29,10 @@ class UserCreate(UserBase):
 
 class UserUpdate(UserBase):
     password: str | None = None
+    phone: str | None = None
+    bio: str | None = None
+    location: str | None = None
+    profile_picture_url: str | None = None
 
 
 class UserInDB(UserBase):
@@ -134,6 +142,12 @@ class JobBase(BaseModel):
     company_id: int | None = None
     title: str
     description_text: str | None = None
+    location: str | None = None
+    salary_min: int | None = None
+    salary_max: int | None = None
+    job_type: Literal["full-time", "part-time", "contract", "internship"] | None = None
+    is_remote: bool = False
+    experience_level: Literal["entry", "mid", "senior", "lead"] | None = None
     required_skills: list[dict[str, Any]] | None = []
     preferred_skills: list[dict[str, Any]] | None = []
     responsibilities: list[str] | None = []
@@ -149,6 +163,12 @@ class JobUpdate(BaseModel):
     company_id: int | None = None
     title: str | None = None
     description_text: str | None = None
+    location: str | None = None
+    salary_min: int | None = None
+    salary_max: int | None = None
+    job_type: Literal["full-time", "part-time", "contract", "internship"] | None = None
+    is_remote: bool | None = None
+    experience_level: Literal["entry", "mid", "senior", "lead"] | None = None
     required_skills: list[dict[str, Any]] | None = None
     preferred_skills: list[dict[str, Any]] | None = None
     responsibilities: list[str] | None = None
@@ -170,6 +190,7 @@ class ApplicationBase(BaseModel):
     full_name: str
     email: str
     phone: str | None = None
+    cover_letter: str | None = None
 
 
 class ApplicationCreate(ApplicationBase):
@@ -188,8 +209,8 @@ class Application(ApplicationBase):
 
     id: int
     match_score: float = 0.0
-    match_details: dict[str, Any] = {}
-    feedback: dict[str, Any] = {}
+    match_details: dict[str, Any] | None = None
+    feedback: dict[str, Any] | None = None
     status: str
     created_at: datetime
     reviewed_at: datetime | None = None

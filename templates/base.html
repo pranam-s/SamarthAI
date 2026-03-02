@@ -4,7 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{{ app_name }}{% endblock %}</title>
-    
+
+    <!-- SEO: Description & Robots -->
+    <meta name="description" content="{% block meta_description %}{{ app_name }} — AI-powered career platform helping job seekers and recruiters connect smarter. Build your resume, discover jobs, and accelerate your career.{% endblock %}">
+    <meta name="robots" content="{% block meta_robots %}index, follow{% endblock %}">
+    <link rel="canonical" href="{{ request.url }}" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:title" content="{% block og_title %}{% block og_title_inner %}{{ app_name }}{% endblock %}{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}{{ app_name }} — AI-powered career platform helping job seekers and recruiters connect smarter.{% endblock %}">
+    <meta property="og:url" content="{{ request.url }}">
+    <meta property="og:site_name" content="{{ app_name }}">
+    <meta property="og:locale" content="{{ locale|default('en') }}">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{% block twitter_title %}{{ app_name }}{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}{{ app_name }} — AI-powered career platform.{% endblock %}">
+
     <!-- Tailwind CSS and DaisyUI -->
     <link href="https://cdn.jsdelivr.net/npm/daisyui@3.7.4/dist/full.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>

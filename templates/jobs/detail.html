@@ -1,6 +1,31 @@
 {% extends "base.html" %}
 
-{% block title %}{{ job.title }} - {{ app_name }}{% endblock %}
+{% block title %}{{ job.title }} - {{ job.company_name | default(app_name) }} — {{ app_name }}{% endblock %}
+
+{% block meta_description %}{{ job.title }} at {{ job.company_name | default(app_name) }}{% if job.location %} in {{ job.location }}{% endif %}. {{ job.description_text[:160] | replace('\n', ' ') }}{% endblock %}
+{% block og_type %}job_posting{% endblock %}
+{% block og_title_inner %}{{ job.title }} — {{ app_name }}{% endblock %}
+{% block og_description %}{{ job.title }} at {{ job.company_name | default(app_name) }}{% if job.location %} — {{ job.location }}{% endif %}. Apply now on {{ app_name }}.{% endblock %}
+{% block twitter_title %}{{ job.title }} — {{ app_name }}{% endblock %}
+{% block twitter_description %}{{ job.title }}{% if job.location %} in {{ job.location }}{% endif %}. Apply on {{ app_name }}.{% endblock %}
+
+{% block head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org/",
+  "@type": "JobPosting",
+  "title": {{ job.title | tojson }},
+  "description": {{ job.description_text | tojson }},
+  "datePosted": {{ job.created_at.strftime('%Y-%m-%d') | tojson }},
+  {% if job.location %}"jobLocation": {"@type": "Place", "address": {{ job.location | tojson }}},{% endif %}
+  {% if job.is_remote %}"jobLocationType": "TELECOMMUTE",{% endif %}
+  {% if job.salary_min and job.salary_max %}"baseSalary": {"@type": "MonetaryAmount", "currency": "INR", "value": {"@type": "QuantitativeValue", "minValue": {{ job.salary_min }}, "maxValue": {{ job.salary_max }}, "unitText": "YEAR"}},{% endif %}
+  {% if job.job_type %}"employmentType": {{ job.job_type | upper | tojson }},{% endif %}
+  "hiringOrganization": {"@type": "Organization", "name": {{ (job.company_name | default(app_name)) | tojson }}},
+  "url": {{ request.url | string | tojson }}
+}
+</script>
+{% endblock %}
 
 {% block content %}
 <div class="flex justify-between items-center mb-6">

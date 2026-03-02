@@ -646,3 +646,200 @@ async def test_update_application_status_forbidden(client: AsyncClient) -> None:
         headers=seek_h,
     )
     assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# GET /auth/me
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_me_authenticated(client: AsyncClient) -> None:
+    """GET /auth/me returns the current user's profile."""
+    headers = await _register_and_login(client, email="me@example.com")
+    resp = await client.get("/api/v1/auth/me", headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["email"] == "me@example.com"
+    assert "id" in data
+    assert "full_name" in data
+
+
+@pytest.mark.asyncio
+async def test_get_me_unauthenticated(client: AsyncClient) -> None:
+    """GET /auth/me without a token should return 403."""
+    resp = await client.get("/api/v1/auth/me")
+    assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Job extended fields (location, salary, job_type, is_remote, level)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_job_with_extended_fields(client: AsyncClient) -> None:
+    """Recruiter can create a job with all extended fields."""
+    rec_h = await _register_and_login(client, email="extjob-rec@e.com", is_recruiter=True)
+    resp = await client.post(
+        "/api/v1/jobs",
+        json={
+            "title": "Senior Python Engineer",
+            "description_text": "Build scalable APIs",
+            "location": "Bangalore, India",
+            "salary_min": 1200000,
+            "salary_max": 2000000,
+            "job_type": "full-time",
+            "is_remote": True,
+            "experience_level": "senior",
+        },
+        headers=rec_h,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["location"] == "Bangalore, India"
+    assert data["salary_min"] == 1200000
+    assert data["salary_max"] == 2000000
+    assert data["job_type"] == "full-time"
+    assert data["is_remote"] is True
+    assert data["experience_level"] == "senior"
+
+
+# ---------------------------------------------------------------------------
+# Non-owner job operations
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_non_owner_cannot_update_job(client: AsyncClient) -> None:
+    """A recruiter cannot update a job they do not own."""
+    owner_h = await _register_and_login(client, email="jobowner@e.com", is_recruiter=True)
+    other_h = await _register_and_login(client, email="jobother@e.com", is_recruiter=True)
+
+    job_resp = await client.post(
+        "/api/v1/jobs",
+        json={"title": "Owner's Job", "description_text": "Some description"},
+        headers=owner_h,
+    )
+    jid = job_resp.json()["id"]
+
+    resp = await client.put(
+        f"/api/v1/jobs/{jid}",
+        json={"title": "Hijacked", "description_text": "Hijacked description"},
+        headers=other_h,
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_non_owner_cannot_delete_job(client: AsyncClient) -> None:
+    """A recruiter cannot delete a job they do not own."""
+    owner_h = await _register_and_login(client, email="deljobowner@e.com", is_recruiter=True)
+    other_h = await _register_and_login(client, email="deljobother@e.com", is_recruiter=True)
+
+    job_resp = await client.post(
+        "/api/v1/jobs",
+        json={"title": "Deletable Job", "description_text": "Will not be deleted by non-owner"},
+        headers=owner_h,
+    )
+    jid = job_resp.json()["id"]
+
+    resp = await client.delete(f"/api/v1/jobs/{jid}", headers=other_h)
+    assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Application with cover letter
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_application_with_cover_letter(client: AsyncClient) -> None:
+    """Job seeker can submit an application with a cover letter."""
+    rec_h = await _register_and_login(client, email="covltr-rec@e.com", is_recruiter=True)
+    job_resp = await client.post(
+        "/api/v1/jobs",
+        json={"title": "Frontend Developer", "description_text": "Build UIs with React"},
+        headers=rec_h,
+    )
+    jid = job_resp.json()["id"]
+
+    seek_h = await _register_and_login(client, email="covltr-seek@e.com")
+    resume_resp = await client.post(
+        "/api/v1/resumes",
+        data={"resume_data": "React developer 3 years experience"},
+        headers=seek_h,
+    )
+    rid = resume_resp.json()["id"]
+
+    resp = await client.post(
+        "/api/v1/applications",
+        json={
+            "job_id": jid,
+            "resume_id": rid,
+            "full_name": "Cover Letter Test",
+            "email": "covltr-seek@e.com",
+            "cover_letter": "I am passionate about building beautiful UIs and believe this role aligns perfectly with my React expertise.",
+        },
+        headers=seek_h,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert (
+        data["cover_letter"]
+        == "I am passionate about building beautiful UIs and believe this role aligns perfectly with my React expertise."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Job public access and enum validation
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_job_by_id_unauthenticated(client: AsyncClient) -> None:
+    """GET /jobs/{id} is intentionally public so job listings can be shared."""
+    rec_h = await _register_and_login(client, email="publjob-rec@e.com", is_recruiter=True)
+    job_resp = await client.post(
+        "/api/v1/jobs",
+        json={"title": "Public Job", "description_text": "Visible to all"},
+        headers=rec_h,
+    )
+    jid = job_resp.json()["id"]
+
+    # No auth headers — should still succeed (public listing)
+    resp = await client.get(f"/api/v1/jobs/{jid}")
+    assert resp.status_code == 200
+    assert resp.json()["id"] == jid
+
+
+@pytest.mark.asyncio
+async def test_create_job_invalid_job_type(client: AsyncClient) -> None:
+    """Creating a job with an invalid job_type returns 422."""
+    rec_h = await _register_and_login(client, email="badjobtype-rec@e.com", is_recruiter=True)
+    resp = await client.post(
+        "/api/v1/jobs",
+        json={
+            "title": "Bad Job",
+            "description_text": "This should fail validation",
+            "job_type": "full_time",  # invalid: uses underscore, not hyphen
+        },
+        headers=rec_h,
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_job_invalid_experience_level(client: AsyncClient) -> None:
+    """Creating a job with an invalid experience_level returns 422."""
+    rec_h = await _register_and_login(client, email="badlevel-rec@e.com", is_recruiter=True)
+    resp = await client.post(
+        "/api/v1/jobs",
+        json={
+            "title": "Bad Level Job",
+            "description_text": "This should fail validation",
+            "experience_level": "beginner",  # invalid value
+        },
+        headers=rec_h,
+    )
+    assert resp.status_code == 422

@@ -34,8 +34,8 @@ class TestTokenSchemas:
         assert tp.sub is None
 
     def test_token_payload_with_sub(self) -> None:
-        tp = TokenPayload(sub=42)
-        assert tp.sub == 42
+        tp = TokenPayload(sub="42")
+        assert tp.sub == "42"
 
     def test_token_creation(self) -> None:
         t = Token(access_token="abc123", token_type="bearer")
