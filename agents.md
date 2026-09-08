@@ -1,88 +1,53 @@
 # agents.md
 
-## Purpose
+## Project (3 lines)
 
-Defines how AI coding agents should contribute to this repository safely and consistently.
+Samarth AI: FastAPI + Jinja SSR platform for resume management and AI-assisted
+job matching (parse, score, gap analysis) for job seekers and recruiters.
+SQLAlchemy 2.0 async over SQLite (default) or PostgreSQL; AI via Google GenAI
+with OpenRouter fallback and heuristic fallbacks when no keys. Python 3.12, uv exclusively.
 
-## Architecture
+## Architecture boundaries
 
-- **Runtime**: Python 3.12, FastAPI, SQLAlchemy 2.0 async (SQLite default / PostgreSQL production)
-- **Auth**: bcrypt (direct, no passlib) + python-jose JWT + itsdangerous CSRF
-- **AI**: Google GenAI (Gemini 2.5 Flash, thinking budget 8192) primary; OpenRouter fallback; heuristic fallback when keys absent
-- **Frontend**: DaisyUI 3 + Tailwind CSS CDN + Alpine.js 3 + Chart.js — served via Jinja2 SSR
-- **Package manager**: `uv` exclusively — do not use `pip` directly
-- **Key files**: `api.py` (REST), `ui.py` (SSR routes), `services.py` (AI + domain logic), `schemas.py` (Pydantic), `models.py` (ORM), `core/` (config, security, i18n)
+- `api.py` (REST `/api/v1`) and `ui.py` (SSR) → `services.py` (domain + AI) → `models.py` (ORM) → `db/database.py`.
+- `schemas.py` = all Pydantic I/O contracts; `core/` = config, security, i18n; `prompts/*.md` = AI prompt templates (edit there, not in Python).
+- Route modules: auth, permission checks, validation, response shaping only — no SQL, no AI calls.
+- Style guides: `docs/style-guides/python.md`, `docs/style-guides/fastapi.md`, `docs/style-guides/testing.md` — binding summaries of PEP 8 / FastAPI / pytest conventions.
 
 ## Standards
 
-- Prefer minimal, root-cause fixes over surface patches.
-- Keep architecture simple: FastAPI + Jinja SSR + service layer.
-- Maintain Python 3.12 compatibility.
-- Use `uv` for dependency and environment management.
-- Schema fields should match model nullability — nullable ORM columns must have `= None` or `= default` in Pydantic schemas.
-- Run full quality gates before declaring completion (see below).
+- Minimal, root-cause fixes; no surface patches, hacks, or stubs-as-done.
+- Schema nullability mirrors ORM (`= None` on nullable columns).
+- Update routes + services + schemas + templates together; add i18n keys to EN + all 19 locale overrides.
+- Quality gates before every commit: `uv run ruff format --check . && uv run ruff check . && uv run ty check && uv run pytest tests/`.
+- Conventional commits (`feat:`, `fix:`, `test:`, `docs:`, `chore(deps):`, `ci:`); commit after each green step.
 
-## Quality Gates (run in order)
+## Testing policy
 
-```bash
-uv run ruff format --check .   # must produce 0 differences
-uv run ruff check .            # must produce 0 diagnostics
-uv run ty check .              # must produce 0 diagnostics
-uv run pytest tests/ -v        # all tests must pass (currently 113)
-```
+- pytest + pytest-asyncio (auto mode) + httpx ASGITransport; in-memory SQLite per test.
+- Test behavior and both sides of permission checks; exercise heuristic fallbacks by disabling provider clients, never by monkeypatching privates.
+- CI gates ≥95% coverage on `core/`, `db/`, `models.py`, `schemas.py` (measured 100%); `api/services/ui` reported only — coverage.py undercounts post-await code (docs/EVALUATION.md).
 
-If any gate fails, fix the issue before committing.
+## Security rules
 
-## Security Rules
+- Never log secrets/tokens/passwords; never render raw exception text to users.
+- httponly cookies, `COOKIE_SECURE`/`COOKIE_SAMESITE` from settings, CSRF on every authenticated form POST; Bearer auth on the API.
+- bcrypt direct (no passlib); PyJWT HS256 (`sub` as str, int-parsed at the boundary); itsdangerous CSRF.
+- Redirect targets from user input must be same-origin relative paths.
+- Uploads: `.pdf`/`.docx`/`.txt` only, capped at `MAX_UPLOAD_SIZE`.
+- Secrets only via `.env` (see `.env.example`); CORS from settings, never `*` in production.
 
-- Never log secrets, tokens, or passwords.
-- Preserve secure auth behavior: `httponly=True` cookies, `COOKIE_SECURE` from settings, `COOKIE_SAMESITE` from settings, CSRF tokens on all authenticated form POST routes.
-- API endpoints use Bearer token auth; UI routes use cookie auth + CSRF.
-- Keep environment-specific settings in `.env` and `core/config.py`. Never hardcode secrets.
-- CORS origins come from `settings.CORS_ORIGINS` — never use `"*"` in production.
+## Accessibility (SSR UI)
 
-## i18n and Accessibility
+- Semantic HTML (`button`, `label`, `nav`, `main`); decorative SVGs get `aria-hidden="true"`.
+- Keyboard-navigable throughout: visible focus rings, skip-to-content link, no mouse-only interactions.
+- All user-facing strings via the `t(key)` helper (`core/i18n.py`).
 
-- All user-facing strings must use the `t(key)` template helper (backed by `core/i18n.py`).
-- When adding new UI strings, add the key to `EN_TRANSLATIONS` first, then add translations to all 19 `LOCALE_OVERRIDES` entries (hi, bn, te, mr, ta, ur, gu, kn, ml, es, fr, ar, zh, pt, de, ru, ja, ko, it).
-- The `translate()` function falls back to English for missing keys, so partial translations degrade gracefully.
-- Prefer semantic HTML: use `<button>`, `<label>`, `<nav>`, `<main>`, `<section>` over generic divs.
-- Decorative SVGs must have `aria-hidden="true"`.
-- Forms must have accessible `<label>` elements and visible submit controls.
-- Ensure keyboard navigation works (focus rings, skip-to-content link).
+## AI integrations
 
-## AI Integrations
-
-- Primary provider: Google GenAI (`google-genai` SDK).
-- Fallback provider: OpenRouter (via `openai` SDK compatibility).
-- AI prompt templates live in `prompts/*.md` — edit them there, not inline in Python.
-- `AIService.parse_json()` handles JSON extraction from LLM output robustly.
-- Always implement heuristic fallback paths in services so the platform works without API keys.
-
-## Contribution Flow
-
-1. Read all impacted files before making changes.
-2. Update service and route contracts together — never change one without the other.
-3. Update Pydantic schemas when ORM model fields change.
-4. Update templates when endpoint or form behavior changes.
-5. Add/update tests for new endpoints or business logic.
-6. Add i18n keys to EN + all 19 locale overrides.
-7. Run all quality gates.
-8. Update `README.md` if behavior, API surface, or test count changes.
-
-## Testing Conventions
-
-- Use `AsyncClient` from `httpx` with `ASGITransport` for API tests.
-- In-memory SQLite (`sqlite+aiosqlite:///:memory:`) for test isolation.
-- Helper: `_register_and_login(client, email, password, is_recruiter)` returns auth headers.
-- Test files: `tests/test_api.py`, `tests/test_services.py`, `tests/test_security.py`, `tests/test_i18n.py`.
-- All tests are async (`@pytest.mark.asyncio`).
+- Google GenAI primary (Gemini 2.5 Flash, `AI_THINKING_BUDGET`), OpenRouter fallback, heuristic fallbacks so core flows work keyless.
+- `AIService.parse_json()` extracts JSON from LLM output; prompts externalized in `prompts/*.md`.
 
 ## Docker
 
-- Base image: `python:3.12-slim` with `ghcr.io/astral-sh/uv:latest` for install.
-- Non-root user `appuser` in container.
-- Health check: `curl -f http://localhost:8000/` with 30s interval.
-- Named volumes: `uploads_data`, `db_data` — do not use anonymous volumes.
-- Resource limits: 512 MB RAM, 1.0 CPU.
-- Secrets via `env_file: .env` — never bake secrets into the image.
+- `python:3.12-slim`, non-root `appuser`, healthcheck on `/`, named volumes `uploads_data`/`db_data`, 512 MB / 1 CPU limits, secrets via `env_file`.
