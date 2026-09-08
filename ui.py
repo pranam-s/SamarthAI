@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
@@ -24,6 +25,14 @@ from services import job_service, matching_service, resume_service, user_service
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
+logger = logging.getLogger(__name__)
+
+
+def safe_redirect_path(path: str) -> str:
+    """Return path if it is a same-origin relative path, else '/'."""
+    if path.startswith("/") and not path.startswith("//") and not path.startswith("/\\"):
+        return path
+    return "/"
 
 
 # Helper for template context
@@ -64,7 +73,13 @@ async def get_optional_user(
     try:
         payload = decode_access_token(token)
         token_data = TokenPayload(**payload)
-        user = await user_service.get_user_by_id(db, token_data.sub)
+        if token_data.sub is None:
+            return None
+        try:
+            user_id = int(token_data.sub)
+        except (ValueError, TypeError):
+            return None
+        user = await user_service.get_user_by_id(db, user_id)
         if not user or not user.is_active:
             return None
         return user
@@ -77,7 +92,7 @@ async def get_optional_user(
 async def home(request: Request, current_user: Annotated[User | None, Depends(get_optional_user)]):
     context = await get_user_context(request, current_user)
     context["active_page"] = "home"
-    return templates.TemplateResponse("index.html", context)
+    return templates.TemplateResponse(request, "index.html", context)
 
 
 # Auth routes
@@ -85,7 +100,7 @@ async def home(request: Request, current_user: Annotated[User | None, Depends(ge
 async def login_page(request: Request):
     context = await get_user_context(request)
     context["active_page"] = "login"
-    return templates.TemplateResponse("auth/login.html", context)
+    return templates.TemplateResponse(request, "auth/login.html", context)
 
 
 @router.post("/login")
@@ -99,7 +114,7 @@ async def login_submit(
     if not user or not user.is_active or not verify_password(password, user.hashed_password):
         context = await get_user_context(request)
         context["error"] = "Invalid email or password"
-        return templates.TemplateResponse("auth/login.html", context, status_code=400)
+        return templates.TemplateResponse(request, "auth/login.html", context, status_code=400)
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(user.id, expires_delta=access_token_expires)
@@ -120,7 +135,7 @@ async def login_submit(
 async def register_page(request: Request):
     context = await get_user_context(request)
     context["active_page"] = "register"
-    return templates.TemplateResponse("auth/register.html", context)
+    return templates.TemplateResponse(request, "auth/register.html", context)
 
 
 @router.post("/register")
@@ -136,7 +151,7 @@ async def register_submit(
     if user:
         context = await get_user_context(request)
         context["error"] = "Email already registered"
-        return templates.TemplateResponse("auth/register.html", context, status_code=400)
+        return templates.TemplateResponse(request, "auth/register.html", context, status_code=400)
 
     user_data = {"email": email, "full_name": full_name, "is_recruiter": is_recruiter}
 
@@ -156,7 +171,9 @@ async def logout():
 @router.post("/set-locale")
 async def set_locale(locale: str = Form(...), redirect_to: str = Form("/")):
     selected = normalize_locale(locale)
-    response = RedirectResponse(url=redirect_to or "/", status_code=status.HTTP_303_SEE_OTHER)
+    response = RedirectResponse(
+        url=safe_redirect_path(redirect_to), status_code=status.HTTP_303_SEE_OTHER
+    )
     response.set_cookie(
         key="locale",
         value=selected,
@@ -193,7 +210,7 @@ async def dashboard(
             "shortlisted": sum(1 for app in applications if app.status == "Shortlisted"),
         }
 
-        return templates.TemplateResponse("dashboard/recruiter.html", context)
+        return templates.TemplateResponse(request, "dashboard/recruiter.html", context)
     else:
         # Job seeker dashboard
         resumes = await resume_service.get_resumes(
@@ -220,7 +237,7 @@ async def dashboard(
             )
             context["recommendations"] = recommendations
 
-        return templates.TemplateResponse("dashboard/jobseeker.html", context)
+        return templates.TemplateResponse(request, "dashboard/jobseeker.html", context)
 
 
 # Resume routes
@@ -234,14 +251,14 @@ async def resumes(
     context["active_page"] = "resumes"
     resumes = await resume_service.get_resumes(db, current_user.id, current_user.is_recruiter)
     context["resumes"] = resumes
-    return templates.TemplateResponse("resumes/index.html", context)
+    return templates.TemplateResponse(request, "resumes/index.html", context)
 
 
 @router.get("/resumes/create", response_class=HTMLResponse)
 async def create_resume_page(request: Request, current_user: User = Depends(get_current_user)):
     context = await get_user_context(request, current_user)
     context["active_page"] = "resumes"
-    return templates.TemplateResponse("resumes/create.html", context)
+    return templates.TemplateResponse(request, "resumes/create.html", context)
 
 
 @router.post("/resumes/create")
@@ -258,7 +275,7 @@ async def create_resume_submit(
     if not resume_file and not resume_text:
         context = await get_user_context(request, current_user)
         context["error"] = "Either file or text must be provided"
-        return templates.TemplateResponse("resumes/create.html", context, status_code=400)
+        return templates.TemplateResponse(request, "resumes/create.html", context, status_code=400)
 
     try:
         if resume_file:
@@ -268,10 +285,11 @@ async def create_resume_submit(
 
         resume = await resume_service.create_resume(db, current_user.id, result)
         return RedirectResponse(url=f"/resumes/{resume.id}", status_code=status.HTTP_303_SEE_OTHER)
-    except Exception as e:
+    except Exception:
+        logger.exception("Resume processing failed")
         context = await get_user_context(request, current_user)
-        context["error"] = f"Error processing resume: {str(e)}"
-        return templates.TemplateResponse("resumes/create.html", context, status_code=400)
+        context["error"] = "Error processing resume. Please check the file and try again."
+        return templates.TemplateResponse(request, "resumes/create.html", context, status_code=400)
 
 
 @router.get("/resumes/{id}", response_class=HTMLResponse)
@@ -305,7 +323,7 @@ async def resume_detail(
         recommendations = await job_service.get_recommendations(resume.id, db, current_user)
         context["recommendations"] = recommendations
 
-    return templates.TemplateResponse("resumes/detail.html", context)
+    return templates.TemplateResponse(request, "resumes/detail.html", context)
 
 
 @router.post("/resumes/{id}/delete")
@@ -339,7 +357,7 @@ async def jobs(
     context["active_page"] = "jobs"
     jobs = await job_service.get_jobs(db, current_user.id, current_user.is_recruiter)
     context["jobs"] = jobs
-    return templates.TemplateResponse("jobs/index.html", context)
+    return templates.TemplateResponse(request, "jobs/index.html", context)
 
 
 @router.get("/jobs/create", response_class=HTMLResponse)
@@ -349,7 +367,7 @@ async def create_job_page(request: Request, current_user: User = Depends(get_cur
 
     context = await get_user_context(request, current_user)
     context["active_page"] = "jobs"
-    return templates.TemplateResponse("jobs/create.html", context)
+    return templates.TemplateResponse(request, "jobs/create.html", context)
 
 
 @router.post("/jobs/create")
@@ -372,12 +390,13 @@ async def create_job_submit(
             db, current_user.id, result, {"title": title, "description_text": description_text}
         )
         return RedirectResponse(url=f"/jobs/{job.id}", status_code=status.HTTP_303_SEE_OTHER)
-    except Exception as e:
+    except Exception:
+        logger.exception("Job creation failed")
         context = await get_user_context(request, current_user)
-        context["error"] = f"Error processing job: {str(e)}"
+        context["error"] = "Error processing job. Please check the description and try again."
         context["title"] = title
         context["description_text"] = description_text
-        return templates.TemplateResponse("jobs/create.html", context, status_code=400)
+        return templates.TemplateResponse(request, "jobs/create.html", context, status_code=400)
 
 
 @router.get("/jobs/{id}", response_class=HTMLResponse)
@@ -409,7 +428,7 @@ async def job_detail(
         applications = await matching_service.get_applications(db, current_user.id, False, job.id)
         context["user_applications"] = applications
 
-    return templates.TemplateResponse("jobs/detail.html", context)
+    return templates.TemplateResponse(request, "jobs/detail.html", context)
 
 
 @router.get("/jobs/{id}/edit", response_class=HTMLResponse)
@@ -429,7 +448,7 @@ async def edit_job_page(
     context = await get_user_context(request, current_user)
     context["active_page"] = "jobs"
     context["job"] = job
-    return templates.TemplateResponse("jobs/edit.html", context)
+    return templates.TemplateResponse(request, "jobs/edit.html", context)
 
 
 @router.post("/jobs/{id}/edit")
@@ -453,23 +472,25 @@ async def edit_job_submit(
 
     try:
         result = await job_service.process_job_description(description_text)
+        parsed = result.get("parsed_data", {})
         update_data = {
             "title": title,
             "description_text": description_text,
-            "required_skills": result.get("required_skills", []),
-            "preferred_skills": result.get("preferred_skills", []),
-            "responsibilities": result.get("responsibilities", []),
-            "qualifications": result.get("qualifications", []),
+            "required_skills": parsed.get("required_skills", job.required_skills),
+            "preferred_skills": parsed.get("preferred_skills", job.preferred_skills),
+            "responsibilities": parsed.get("responsibilities", job.responsibilities),
+            "qualifications": parsed.get("qualifications", job.qualifications),
         }
         await job_service.update_job(db, id, update_data)
         return RedirectResponse(url=f"/jobs/{id}", status_code=status.HTTP_303_SEE_OTHER)
-    except Exception as e:
+    except Exception:
+        logger.exception("Job update failed")
         context = await get_user_context(request, current_user)
-        context["error"] = f"Error updating job: {e!s}"
+        context["error"] = "Error updating job. Please check the description and try again."
         context["job"] = job
         context["title"] = title
         context["description_text"] = description_text
-        return templates.TemplateResponse("jobs/edit.html", context, status_code=400)
+        return templates.TemplateResponse(request, "jobs/edit.html", context, status_code=400)
 
 
 @router.post("/jobs/{id}/delete")
@@ -531,7 +552,7 @@ async def applications(
         )
 
     context["applications"] = applications
-    return templates.TemplateResponse("applications/index.html", context)
+    return templates.TemplateResponse(request, "applications/index.html", context)
 
 
 @router.post("/applications/create")
@@ -626,7 +647,7 @@ async def application_detail(
     context["match_details"] = application.match_details
     context["feedback"] = application.feedback
 
-    return templates.TemplateResponse("applications/detail.html", context)
+    return templates.TemplateResponse(request, "applications/detail.html", context)
 
 
 @router.post("/applications/{id}/update-status")
@@ -675,7 +696,7 @@ async def market_analysis(
     analysis = await job_service.get_market_analysis(db, current_user)
     context["analysis"] = analysis
 
-    return templates.TemplateResponse("analysis/index.html", context)
+    return templates.TemplateResponse(request, "analysis/index.html", context)
 
 
 # Skills Gap Analysis routes
@@ -696,4 +717,4 @@ async def skills_gap(
     context["resumes"] = resumes
     context["jobs"] = jobs
 
-    return templates.TemplateResponse("skills_gap/index.html", context)
+    return templates.TemplateResponse(request, "skills_gap/index.html", context)

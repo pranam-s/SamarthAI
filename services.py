@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -11,7 +12,7 @@ from typing import Any
 
 import aiofiles
 from docx import Document
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile, status
 from google import genai
 from google.genai import types
 from openai import OpenAI
@@ -28,6 +29,8 @@ from models import User as UserModel
 logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(settings.PROMPTS_DIR)
+
+ALLOWED_UPLOAD_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
 
 def _load_prompt(name: str) -> str:
@@ -464,12 +467,33 @@ class ResumeService:
     async def process_resume_file(self, file: UploadFile) -> dict[str, Any]:
         filename = file.filename or "resume.txt"
         ext = os.path.splitext(filename)[1].lower()
+        if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail=f"Unsupported file type {ext!r}. "
+                f"Allowed: {', '.join(sorted(ALLOWED_UPLOAD_EXTENSIONS))}",
+            )
         unique_name = f"{uuid.uuid4()}{ext}"
         file_path = os.path.join(settings.UPLOAD_DIR, unique_name)
 
-        async with aiofiles.open(file_path, "wb") as out:
-            while chunk := await file.read(1024 * 1024):
-                await out.write(chunk)
+        try:
+            async with aiofiles.open(file_path, "wb") as out:
+                written = 0
+                while chunk := await file.read(1024 * 1024):
+                    written += len(chunk)
+                    if written > settings.MAX_UPLOAD_SIZE:
+                        raise HTTPException(
+                            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                            detail=(
+                                "File too large. Maximum upload size is "
+                                f"{settings.MAX_UPLOAD_SIZE // (1024 * 1024)} MB."
+                            ),
+                        )
+                    await out.write(chunk)
+        except HTTPException:
+            with contextlib.suppress(OSError):
+                os.remove(file_path)
+            raise
 
         if ext == ".pdf":
             text = await self.ai.extract_resume_from_pdf(file_path)

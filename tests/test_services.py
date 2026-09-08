@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-import pytest
+import io
+import os
 
-from services import AIService
+import pytest
+from fastapi import HTTPException, UploadFile
+
+from core.config import settings
+from services import AIService, ResumeService
 
 # ---------------------------------------------------------------------------
 # AIService.parse_json
@@ -327,3 +332,64 @@ async def test_generate_resume_feedback_fallback(
     assert "missing_skills" in feedback
     assert "keyword_recommendations" in feedback
     assert isinstance(feedback["strengths"], list)
+
+
+# ---------------------------------------------------------------------------
+# ResumeService.process_resume_file — upload hardening (audit A-01/A-02)
+# ---------------------------------------------------------------------------
+
+
+def _make_upload(filename: str, content: bytes) -> UploadFile:
+    return UploadFile(filename=filename, file=io.BytesIO(content))
+
+
+class TestProcessResumeFileHardening:
+    @pytest.fixture
+    def resume_service(self) -> ResumeService:
+        return ResumeService(ai_service_for_tests())
+
+    @pytest.fixture(autouse=True)
+    def _cleanup_uploads(self):
+        yield
+        for name in os.listdir(settings.UPLOAD_DIR):
+            os.remove(os.path.join(settings.UPLOAD_DIR, name))
+
+    async def test_rejects_disallowed_extension(self, resume_service: ResumeService) -> None:
+        upload = _make_upload("payload.exe", b"MZ binary")
+        with pytest.raises(HTTPException) as exc_info:
+            await resume_service.process_resume_file(upload)
+        assert exc_info.value.status_code == 415
+
+    async def test_rejects_missing_extension(self, resume_service: ResumeService) -> None:
+        upload = _make_upload("noext", b"text")
+        with pytest.raises(HTTPException) as exc_info:
+            await resume_service.process_resume_file(upload)
+        assert exc_info.value.status_code == 415
+
+    async def test_enforces_max_upload_size(
+        self, resume_service: ResumeService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(settings, "MAX_UPLOAD_SIZE", 8)
+        upload = _make_upload("big.txt", b"x" * 100)
+        with pytest.raises(HTTPException) as exc_info:
+            await resume_service.process_resume_file(upload)
+        assert exc_info.value.status_code == 413
+
+    async def test_no_partial_file_left_after_oversize(
+        self, resume_service: ResumeService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(settings, "MAX_UPLOAD_SIZE", 8)
+        upload = _make_upload("big.txt", b"x" * 100)
+        with pytest.raises(HTTPException):
+            await resume_service.process_resume_file(upload)
+        assert os.listdir(settings.UPLOAD_DIR) == []
+
+    async def test_accepts_allowed_txt_file(self, resume_service: ResumeService) -> None:
+        upload = _make_upload("resume.txt", b"Python developer")
+        result = await resume_service.process_resume_file(upload)
+        assert result["file_type"] == "txt"
+        assert "Python developer" in result["full_text"]
+
+
+def ai_service_for_tests() -> AIService:
+    return AIService()
