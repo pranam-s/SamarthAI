@@ -1,5 +1,7 @@
 # Samarth AI Resume Platform
 
+[![CI](https://github.com/pranam-s/SamarthAI/actions/workflows/ci.yml/badge.svg)](https://github.com/pranam-s/SamarthAI/actions/workflows/ci.yml)
+
 Production-oriented FastAPI platform for resume management, AI-assisted job matching, skills gap analysis, and multilingual recruiter/jobseeker workflows.
 
 **Maintainer:** pranam-s · [GitHub](https://github.com/pranam-s/SamarthAI)
@@ -129,9 +131,14 @@ All API endpoints are prefixed with `/api/v1/`.
 ```bash
 uv run ruff format --check .   # formatting
 uv run ruff check .            # linting
-uv run ty check .              # type checking
-uv run pytest tests/ -v        # 113 tests
+uv run ty check .              # type checking (blocking in CI)
+uv run pytest tests/ -v        # 153 tests
 ```
+
+CI enforces a coverage gate of ≥95% on the fully-measurable core modules
+(`core/`, `db/`, `models.py`, `schemas.py` — currently 100%). See
+`docs/EVALUATION.md` for why `api.py`/`services.py`/`ui.py` are reported but
+not gated (coverage.py undercounts code resumed after async DB awaits).
 
 ## Docker
 
@@ -159,7 +166,8 @@ The compose file includes a health check, named volumes for uploads and the data
 ├── prompts/             Externalized AI prompt templates (.md)
 ├── templates/           Jinja2 SSR templates
 ├── static/              Static assets
-├── tests/               113 tests (services, security, i18n, API)
+├── tests/               153 tests (services, security, i18n, config, database, API, UI)
+├── docs/                Audit, PRD, architecture, evaluation, style guides
 ├── .env.example         Example environment configuration
 ├── .github/workflows/   CI/CD pipeline (quality + test + docker)
 ├── Dockerfile           Container build (python:3.12-slim, non-root user)

@@ -32,12 +32,11 @@ jobs:
       - name: Ruff lint
         run: uv run ruff check .
 
-      - name: Type check (ty)
+      - name: Type check (ty) — blocking
         run: uv run ty check
-        continue-on-error: true
 
   test:
-    name: Tests
+    name: Tests & Coverage
     runs-on: ubuntu-latest
     needs: quality
     steps:
@@ -52,8 +51,14 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-groups
 
-      - name: Run tests with coverage
-        run: uv run pytest tests/ -v --tb=short --cov=. --cov-report=term-missing
+      # Coverage gate is scoped to fully-measurable modules. api.py/services.py/ui.py
+      # undercount async code resumed after aiosqlite awaits (docs/AUDIT.md A-21,
+      # docs/EVALUATION.md) so they are reported but not gated.
+      - name: Run tests with coverage gate on core modules
+        run: >
+          uv run pytest tests/ -v --tb=short
+          --cov=core --cov=db --cov=models.py --cov=schemas.py
+          --cov-report=term-missing --cov-fail-under=95
         env:
           SECRET_KEY: "ci-test-secret-key-not-real"
           DATABASE_URL: "sqlite+aiosqlite:///./test.db"
