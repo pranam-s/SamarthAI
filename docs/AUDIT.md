@@ -30,6 +30,7 @@ templates structure, tests, CI, Docker, docs. Baseline: 124 tests pass; ruff cle
 | A-21 | Info | tooling | Coverage undercount bug (documented in EVALUATION.md): on FastAPI + aiosqlite + coverage 7.13.4, code resumed after an `await db.execute(...)` suspension is not recorded — reproducible with a 14-line Starlette repro, on Python 3.12.14 and 3.13.15, under both `sysmon` and `ctrace` cores. Measured coverage of `api.py`/`services.py`/`ui.py` therefore undercounts truly-executed lines. | Documented; coverage gate scoped accordingly |
 | A-22 | Info | security.py | bcrypt direct (no passlib) — correct 72-byte handling relies on bcrypt 4+/5 behavior; PyJWT HS256 with `settings.SECRET_KEY`; CSRF via itsdangerous timed serializer (2 h max age). No issues found. | None |
 | A-23 | Info | i18n.py | `normalize_locale`/`translate` fallback chain is correct; all 20 locales carry full EN key sets (tested). | None |
+| A-24 | Medium | ui.py | `edit_job_submit` read parsed skills from the wrong dict level (`result.get("required_skills")` instead of `result["parsed_data"]`), wiping extracted skills on every UI job edit. | **Fixed** + regression test |
 
 ## Verified-good (no action)
 
@@ -41,14 +42,19 @@ templates structure, tests, CI, Docker, docs. Baseline: 124 tests pass; ruff cle
 
 ## Coverage baseline at audit time (pytest-cov, Windows, Py 3.12.14)
 
+Post-fix numbers (153 tests); "undercounted" = A-21 applies.
+
 | Module | Stmts | Miss | Cover |
 |---|---|---|---|
 | core/security.py | 39 | 0 | 100% |
 | core/i18n.py | 16 | 0 | 100% |
-| core/config.py | 41 | 1 | 98% |
-| db/database.py | 12 | 2 | 83% |
+| core/config.py | 41 | 0 | 100% (was 98%) |
+| db/database.py | 12 | 0 | 100% (was 83%) |
 | models.py | 77 | 0 | 100% |
 | schemas.py | 220 | 0 | 100% |
-| api.py | 246 | 123 | 50% (undercounted — A-21) |
-| services.py | 474 | 200 | 58% (undercounted — A-21) |
-| ui.py | 352 | 281 | 20% (undercounted — A-21, plus genuinely untested UI routes) |
+| main.py | 31 | 8 | 74% |
+| services.py | 487 | 197 | 60% (undercounted) |
+| api.py | 246 | 123 | 50% (undercounted) |
+| ui.py | 368 | 244 | 34% (undercounted + real gaps) |
+
+Full analysis: docs/EVALUATION.md.
