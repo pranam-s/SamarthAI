@@ -5,6 +5,10 @@ from __future__ import annotations
 import time
 from datetime import timedelta
 
+import jwt
+import pytest
+
+from core.config import settings
 from core.security import (
     create_access_token,
     create_csrf_token,
@@ -38,11 +42,8 @@ class TestAccessToken:
         assert payload["exp"] > time.time()
 
     def test_expired_token_raises(self) -> None:
-        import jwt as pyjwt
-        import pytest
-
         token = create_access_token(subject=1, expires_delta=timedelta(seconds=-1))
-        with pytest.raises(pyjwt.ExpiredSignatureError):
+        with pytest.raises(jwt.ExpiredSignatureError):
             decode_access_token(token)
 
 
@@ -91,3 +92,19 @@ class TestCSRFToken:
         token = create_csrf_token(subject="user-abc")
         assert verify_csrf_token(token, subject="user-abc") is True
         assert verify_csrf_token(token, subject="user-xyz") is False
+
+    def test_expired_csrf_token_fails(self) -> None:
+        token = create_csrf_token(subject=5)
+        assert verify_csrf_token(token, subject=5, max_age_seconds=-1) is False
+
+
+class TestDecodeErrors:
+    def test_wrong_key_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        token = create_access_token(subject=1)
+        monkeypatch.setattr(settings, "SECRET_KEY", "a-completely-different-key")
+        with pytest.raises(jwt.InvalidSignatureError):
+            decode_access_token(token)
+
+    def test_garbage_token_rejected(self) -> None:
+        with pytest.raises(jwt.InvalidTokenError):
+            decode_access_token("garbage.token.value")
