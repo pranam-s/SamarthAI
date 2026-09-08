@@ -267,10 +267,9 @@ class TestHeuristicMatchScore:
 async def test_parse_resume_fallback_without_provider(sample_resume_text: str) -> None:
     service = AIService()
 
-    async def _no_call(*args, **kwargs):
-        return None
-
-    service._call_text = _no_call  # type: ignore[method-assign]
+    # Disable both AI providers so the call path exercises heuristic fallbacks.
+    service.google_client = None
+    service.openrouter_client = None
     parsed = await service.parse_resume(sample_resume_text)
 
     assert "parsed_sections" in parsed
@@ -282,10 +281,9 @@ async def test_parse_resume_fallback_without_provider(sample_resume_text: str) -
 async def test_parse_job_fallback_without_provider() -> None:
     service = AIService()
 
-    async def _no_call(*args, **kwargs):
-        return None
-
-    service._call_text = _no_call  # type: ignore[method-assign]
+    # Disable both AI providers so the call path exercises heuristic fallbacks.
+    service.google_client = None
+    service.openrouter_client = None
     parsed = await service.parse_job_description("Backend Engineer\nRequires Python and SQL")
 
     assert parsed["title"] == "Backend Engineer"
@@ -300,10 +298,9 @@ async def test_calculate_match_score_fallback(
 ) -> None:
     service = AIService()
 
-    async def _no_call(*args, **kwargs):
-        return None
-
-    service._call_text = _no_call  # type: ignore[method-assign]
+    # Disable both AI providers so the call path exercises heuristic fallbacks.
+    service.google_client = None
+    service.openrouter_client = None
     score, details = await service.calculate_match_score(sample_parsed_resume, sample_parsed_job)
 
     assert 0 <= score <= 100
@@ -317,10 +314,9 @@ async def test_generate_resume_feedback_fallback(
 ) -> None:
     service = AIService()
 
-    async def _no_call(*args, **kwargs):
-        return None
-
-    service._call_text = _no_call  # type: ignore[method-assign]
+    # Disable both AI providers so the call path exercises heuristic fallbacks.
+    service.google_client = None
+    service.openrouter_client = None
 
     _, match_details = service._heuristic_match_score(sample_parsed_resume, sample_parsed_job)
     feedback = await service.generate_resume_feedback(

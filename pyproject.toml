@@ -1,52 +1,47 @@
 [project]
 name = "samarth-ai"
-version = "0.3.0"
+version = "0.4.0"
 description = "AI-driven resume and job matching platform"
 readme = "README.md"
 authors = [{ name = "pranam-s" }]
 requires-python = ">=3.12,<3.13"
 dependencies = [
-  "fastapi>=0.115.0",
-  "uvicorn[standard]>=0.34.0",
-  "pydantic[email]>=2.11.0",
-  "pydantic-settings>=2.9.0",
-  "sqlalchemy>=2.0.40",
-  "aiosqlite>=0.21.0",
-  "asyncpg>=0.30.0",
-  "bcrypt>=4.2.0",
-  "python-multipart>=0.0.20",
+  "fastapi>=0.141.1",
+  "uvicorn[standard]>=0.52.4",
+  "pydantic[email]>=2.13.5",
+  "pydantic-settings>=2.15.0",
+  "sqlalchemy>=2.0.52",
+  "aiosqlite>=0.22.1",
+  "asyncpg>=0.31.0",
+  "bcrypt>=5.0.0",
+  "python-multipart>=0.0.32",
   "httpx>=0.28.1",
-  "aiofiles>=24.1.0",
-  "pypdf>=6.0.0",
-  "python-docx>=1.1.0",
-  "google-genai>=1.14.0",
-  "openai>=1.70.0",
+  "aiofiles>=25.1.0",
+  "pypdf>=6.1.0",
+  "python-docx>=1.2.0",
+  "google-genai>=2.22.0",
+  "openai>=3.9.0",
   "jinja2>=3.1.6",
   "itsdangerous>=2.2.0",
-  "pyjwt[cryptography]>=2.9.0",
+  "pyjwt[crypto]>=2.13.0",
 ]
 
 [dependency-groups]
 dev = [
-  "pytest>=8.3.0",
-  "pytest-asyncio>=0.25.0",
-  "pytest-cov>=6.1.0",
-  "httpx>=0.28.1",
+  "pytest>=9.1.1",
+  "pytest-asyncio>=1.4.0",
+  "pytest-cov>=7.1.0",
+  "coverage[toml]>=7.16.0",
 ]
 lint = [
-  "ruff>=0.11.0",
+  "ruff>=0.16.6",
 ]
 type = [
-  "ty>=0.0.1a10",
-]
-test = [
-  "pytest>=8.3.0",
-  "pytest-asyncio>=0.25.0",
-  "httpx>=0.28.1",
+  "ty>=0.0.79",
 ]
 
 [tool.uv]
-default-groups = ["dev", "lint", "type", "test"]
+default-groups = ["dev", "lint", "type"]
 
 [tool.ruff]
 line-length = 100
@@ -75,3 +70,16 @@ deprecated = "ignore"
 testpaths = ["tests"]
 addopts = "-q"
 asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+  ".venv/*",
+  "tests/*",
+]
+
+[tool.coverage.report]
+# api.py / services.py / ui.py undercount async code resumed after aiosqlite
+# awaits (see docs/AUDIT.md A-21 and docs/EVALUATION.md). Gate is enforced on
+# fully-measurable core modules via --cov flags in CI instead of fail_under.
+show_missing = true
