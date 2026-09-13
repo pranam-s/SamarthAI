@@ -35,7 +35,7 @@
                     <option value="">-- {{ t('skills_gap.select_resume') }} --</option>
                     {% for resume in resumes %}
                     <option value="{{ resume.id }}">
-                        {{ resume.parsed_sections.get('contact', {}).get('name', '') or 'Resume #' ~ resume.id }}
+                        {{ contact_section(resume.parsed_sections).get('name') or 'Resume #' ~ resume.id }}
                     </option>
                     {% endfor %}
                 </select>

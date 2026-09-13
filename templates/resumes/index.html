@@ -28,7 +28,7 @@
             {% for resume in resumes %}
             <tr class="hover">
                 <td>{{ resume.id }}</td>
-                <td>{{ resume.parsed_sections.get('contact', {}).get('name', t('resumes.unnamed')) }}</td>
+                <td>{{ contact_section(resume.parsed_sections).get('name') or t('resumes.unnamed') }}</td>
                 <td>{{ resume.skills|length if resume.skills else 0 }} {{ t('resumes.skills_suffix') }}</td>
                 <td>{{ resume.experience|length if resume.experience else 0 }} {{ t('resumes.entries_suffix') }}</td>
                 <td>{{ resume.created_at.strftime('%Y-%m-%d') }}</td>

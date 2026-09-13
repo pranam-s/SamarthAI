@@ -58,6 +58,9 @@ async def get_user_context(request: Request, current_user: User | None = None):
         "supported_locales": settings.SUPPORTED_LOCALES,
         "csrf_token": csrf_token,
         "t": lambda key: translate(locale, key),
+        # Stored resume payloads wrap contact info in a nested 'parsed_sections'
+        # object; templates use this shape-aware reader (audit A-15 follow-up).
+        "contact_section": contact_section,
     }
 
 

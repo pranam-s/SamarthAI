@@ -34,8 +34,9 @@
                     <div class="overflow-x-auto">
                         <table class="table">
                             <tbody>
-                                {% if resume.parsed_sections.get('contact') %}
-                                {% for key, value in resume.parsed_sections.get('contact').items() %}
+                                {% set contact = contact_section(resume.parsed_sections) %}
+                                {% if contact %}
+                                {% for key, value in contact.items() %}
                                 {% if value %}
                                 <tr>
                                     <td class="font-medium capitalize">{{ key }}</td>

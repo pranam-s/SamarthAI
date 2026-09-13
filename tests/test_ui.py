@@ -311,3 +311,37 @@ class TestApplicationsPage:
         assert resp.status_code == 200
         assert "Listing Job Beta" in resp.text
         assert "Jane Doe" in resp.text
+
+
+# ---------------------------------------------------------------------------
+# Resume pages render parsed contact info (nested payload shape)
+# ---------------------------------------------------------------------------
+
+
+class TestResumesPage:
+    async def _upload_resume(self, client: AsyncClient) -> str:
+        await _register_and_login_ui(client, "ui-resumes@example.com", "ui-pass-123")
+        csrf = await _get_csrf_token(client, "/resumes/create")
+        resp = await client.post(
+            "/resumes/create",
+            data={
+                "resume_text": "Jane Doe\nPython Developer\nEmail: jane@example.com\nPython SQL",
+                "csrf_token": csrf,
+            },
+            follow_redirects=False,
+        )
+        assert resp.status_code == 303
+        return resp.headers["location"]
+
+    async def test_resume_list_shows_parsed_name(self, client: AsyncClient):
+        await self._upload_resume(client)
+        listing = await client.get("/resumes")
+        assert listing.status_code == 200
+        assert "Jane Doe" in listing.text
+        assert "Unnamed Resume" not in listing.text
+
+    async def test_resume_detail_shows_contact_info(self, client: AsyncClient):
+        detail_path = await self._upload_resume(client)
+        detail = await client.get(detail_path)
+        assert detail.status_code == 200
+        assert "jane@example.com" in detail.text

@@ -9,7 +9,7 @@ import pytest
 from fastapi import HTTPException, UploadFile
 
 from core.config import settings
-from services import AIService, ResumeService, extract_skill_names
+from services import AIService, ResumeService, contact_section, extract_skill_names
 
 # ---------------------------------------------------------------------------
 # AIService.parse_json
@@ -85,6 +85,29 @@ class TestExtractSkillNames:
         skills = [{"name": "  Python  "}, " SQL "]
         result = extract_skill_names(skills)
         assert result == ["python", "sql"]
+
+
+# ---------------------------------------------------------------------------
+# services.contact_section
+# ---------------------------------------------------------------------------
+
+
+class TestContactSection:
+    """contact_section must tolerate both stored resume payload shapes."""
+
+    def test_reads_nested_payload_shape(self) -> None:
+        payload = {"parsed_sections": {"contact": {"name": "Jane Doe", "email": "j@e.com"}}}
+        assert contact_section(payload) == {"name": "Jane Doe", "email": "j@e.com"}
+
+    def test_reads_flat_shape(self) -> None:
+        assert contact_section({"contact": {"name": "Jane"}}) == {"name": "Jane"}
+
+    def test_returns_empty_for_missing_contact(self) -> None:
+        assert contact_section({"parsed_sections": {}}) == {}
+
+    def test_returns_empty_for_non_dict(self) -> None:
+        assert contact_section(None) == {}
+        assert contact_section([]) == {}
 
 
 # ---------------------------------------------------------------------------
