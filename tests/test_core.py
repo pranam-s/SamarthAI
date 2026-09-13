@@ -65,3 +65,9 @@ class TestDatabase:
     async def test_base_metadata_has_all_tables(self) -> None:
         expected = {"users", "resumes", "jobs", "applications"}
         assert expected == set(Base.metadata.tables.keys())
+
+    def test_static_dir_resolved_from_repo_not_cwd(self) -> None:
+        from main import STATIC_DIR
+
+        assert STATIC_DIR.is_absolute()
+        assert STATIC_DIR.name == "static"

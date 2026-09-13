@@ -1,7 +1,7 @@
 import logging
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,8 +18,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-os.makedirs("static", exist_ok=True)
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+STATIC_DIR.mkdir(exist_ok=True)
+Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
 
 
 @asynccontextmanager
@@ -46,7 +47,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 app.include_router(api_router)
 app.include_router(ui_router)
