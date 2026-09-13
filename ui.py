@@ -14,14 +14,13 @@ from core.security import (
     MIN_PASSWORD_LENGTH,
     create_access_token,
     create_csrf_token,
-    decode_access_token,
+    decode_token_subject,
     get_password_hash,
     verify_csrf_token,
     verify_password,
 )
 from db.database import get_db
 from models import User
-from schemas import TokenPayload
 from services import (
     contact_section,
     job_service,
@@ -74,24 +73,19 @@ async def get_optional_user(
     if not token:
         return None
 
-    if token.startswith("Bearer "):
-        token = token.replace("Bearer ", "", 1)
+    subject = decode_token_subject(token)
+    if subject is None:
+        return None
 
     try:
-        payload = decode_access_token(token)
-        token_data = TokenPayload(**payload)
-        if token_data.sub is None:
-            return None
-        try:
-            user_id = int(token_data.sub)
-        except (ValueError, TypeError):
-            return None
-        user = await user_service.get_user_by_id(db, user_id)
-        if not user or not user.is_active:
-            return None
-        return user
-    except Exception:
+        user_id = int(subject)
+    except ValueError:
         return None
+
+    user = await user_service.get_user_by_id(db, user_id)
+    if not user or not user.is_active:
+        return None
+    return user
 
 
 # Home page

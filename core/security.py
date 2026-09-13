@@ -31,6 +31,22 @@ def decode_access_token(token: str) -> dict:
     return jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
 
 
+def decode_token_subject(token: str) -> str | None:
+    """Decode a presented bearer/cookie JWT and return its ``sub`` claim.
+
+    Accepts an optional 'Bearer ' prefix; returns None for missing subject or
+    any invalid/expired/malformed token.
+    """
+    if token.startswith("Bearer "):
+        token = token[7:]
+    try:
+        payload = decode_access_token(token)
+    except jwt.InvalidTokenError:
+        return None
+    sub = payload.get("sub")
+    return str(sub) if sub is not None else None
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     pwd_bytes = plain_password.encode("utf-8")
     hash_bytes = hashed_password.encode("utf-8")

@@ -4,14 +4,17 @@ import logging
 from datetime import timedelta
 from typing import Annotated, Any
 
-import jwt
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
-from core.security import ALGORITHM, create_access_token, get_password_hash, verify_password
+from core.security import (
+    create_access_token,
+    decode_token_subject,
+    get_password_hash,
+    verify_password,
+)
 from db.database import get_db
 from models import User
 from schemas import (
@@ -28,7 +31,6 @@ from schemas import (
     SkillsGapRequest,
     SkillsGapResponse,
     Token,
-    TokenPayload,
     UserCreate,
 )
 from schemas import User as UserSchema
@@ -60,20 +62,13 @@ async def get_current_user(
     if not selected_token:
         raise _unauthenticated()
 
-    if selected_token.startswith("Bearer "):
-        selected_token = selected_token.replace("Bearer ", "", 1)
-
-    try:
-        payload = jwt.decode(selected_token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-        token_data = TokenPayload(**payload)
-    except (jwt.InvalidTokenError, ValidationError) as err:
-        raise _unauthenticated() from err
-
-    if token_data.sub is None:
+    subject = decode_token_subject(selected_token)
+    if subject is None:
         raise _unauthenticated()
+
     try:
-        user_id = int(token_data.sub)
-    except (ValueError, TypeError) as err:
+        user_id = int(subject)
+    except ValueError as err:
         raise _unauthenticated() from err
 
     user = await user_service.get_user_by_id(db, user_id)

@@ -13,6 +13,7 @@ from core.security import (
     create_access_token,
     create_csrf_token,
     decode_access_token,
+    decode_token_subject,
     get_password_hash,
     verify_csrf_token,
     verify_password,
@@ -108,3 +109,29 @@ class TestDecodeErrors:
     def test_garbage_token_rejected(self) -> None:
         with pytest.raises(jwt.InvalidTokenError):
             decode_access_token("garbage.token.value")
+
+
+class TestDecodeTokenSubject:
+    def test_returns_string_subject(self) -> None:
+        token = create_access_token(subject=42)
+        assert decode_token_subject(token) == "42"
+
+    def test_strips_bearer_prefix(self) -> None:
+        token = create_access_token(subject=42)
+        assert decode_token_subject(f"Bearer {token}") == "42"
+
+    def test_missing_subject_returns_none(self) -> None:
+        token = jwt.encode({"some": "claim"}, settings.SECRET_KEY, algorithm="HS256")
+        assert decode_token_subject(token) is None
+
+    def test_garbage_returns_none(self) -> None:
+        assert decode_token_subject("garbage.token.value") is None
+
+    def test_expired_returns_none(self) -> None:
+        token = create_access_token(subject=1, expires_delta=timedelta(seconds=-1))
+        assert decode_token_subject(token) is None
+
+    def test_wrong_key_returns_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        token = create_access_token(subject=1)
+        monkeypatch.setattr(settings, "SECRET_KEY", "a-completely-different-key")
+        assert decode_token_subject(token) is None
