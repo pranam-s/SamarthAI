@@ -51,6 +51,25 @@ def extract_skill_names(skills: Any) -> list[str]:
     return values
 
 
+def contact_section(parsed_sections: Any) -> dict[str, Any]:
+    """Return the contact object from a stored resume payload.
+
+    ResumeModel.parsed_sections stores the full parse payload (with a nested
+    'parsed_sections' object), so readers must tolerate both levels.
+    """
+    if not isinstance(parsed_sections, dict):
+        return {}
+    contact = parsed_sections.get("contact")
+    if isinstance(contact, dict) and contact:
+        return contact
+    inner = parsed_sections.get("parsed_sections")
+    if isinstance(inner, dict):
+        candidate = inner.get("contact")
+        if isinstance(candidate, dict):
+            return candidate
+    return {}
+
+
 class AIService:
     """Handles all AI provider interactions with Google GenAI primary and OpenRouter fallback."""
 
@@ -572,6 +591,15 @@ class ResumeService:
         result = await db.execute(select(ResumeModel).where(ResumeModel.id == resume_id))
         return result.scalars().first()
 
+    async def get_resumes_by_ids(
+        self, db: AsyncSession, resume_ids: set[int]
+    ) -> dict[int, ResumeModel]:
+        """Return {id: resume} for the given ids in a single query."""
+        if not resume_ids:
+            return {}
+        result = await db.execute(select(ResumeModel).where(ResumeModel.id.in_(resume_ids)))
+        return {r.id: r for r in result.scalars().all()}
+
     async def delete_resume(self, db: AsyncSession, resume_id: int) -> bool:
         resume = await self.get_resume(db, resume_id)
         if not resume:
@@ -641,6 +669,13 @@ class JobService:
     async def get_job(self, db: AsyncSession, job_id: int) -> JobModel | None:
         result = await db.execute(select(JobModel).where(JobModel.id == job_id))
         return result.scalars().first()
+
+    async def get_jobs_by_ids(self, db: AsyncSession, job_ids: set[int]) -> dict[int, JobModel]:
+        """Return {id: job} for the given ids in a single query."""
+        if not job_ids:
+            return {}
+        result = await db.execute(select(JobModel).where(JobModel.id.in_(job_ids)))
+        return {j.id: j for j in result.scalars().all()}
 
     async def update_job(
         self, db: AsyncSession, job_id: int, job_data: dict[str, Any]

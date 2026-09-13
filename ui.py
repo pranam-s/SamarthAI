@@ -22,7 +22,13 @@ from core.security import (
 from db.database import get_db
 from models import User
 from schemas import TokenPayload
-from services import job_service, matching_service, resume_service, user_service
+from services import (
+    contact_section,
+    job_service,
+    matching_service,
+    resume_service,
+    user_service,
+)
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -532,32 +538,32 @@ async def applications(
         db, current_user.id, current_user.is_recruiter
     )
 
-    # Batch-fetch jobs and resumes to avoid N+1 queries
-    job_ids = {app.job_id for app in applications}
-    resume_ids = {app.resume_id for app in applications}
+    jobs_map = await job_service.get_jobs_by_ids(db, {app.job_id for app in applications})
+    resumes_map = await resume_service.get_resumes_by_ids(
+        db, {app.resume_id for app in applications}
+    )
 
-    jobs_map: dict[int, Any] = {}
-    resumes_map: dict[int, Any] = {}
-    for jid in job_ids:
-        j = await job_service.get_job(db, jid)
-        if j:
-            jobs_map[jid] = j
-    for rid in resume_ids:
-        r = await resume_service.get_resume(db, rid)
-        if r:
-            resumes_map[rid] = r
-
+    rows: list[dict[str, Any]] = []
     for app in applications:
         job = jobs_map.get(app.job_id)
         resume = resumes_map.get(app.resume_id)
-        app.job_title = job.title if job else "Unknown Job"
-        app.resume_name = (
-            resume.parsed_sections.get("contact", {}).get("name", "Unnamed Resume")
-            if resume
-            else "Unknown Resume"
+        rows.append(
+            {
+                "id": app.id,
+                "full_name": app.full_name,
+                "job_title": job.title if job else "Unknown Job",
+                "resume_name": (
+                    contact_section(resume.parsed_sections).get("name") or "Unnamed Resume"
+                    if resume
+                    else "Unknown Resume"
+                ),
+                "match_score": app.match_score,
+                "status": app.status,
+                "created_at": app.created_at,
+            }
         )
 
-    context["applications"] = applications
+    context["applications"] = rows
     return templates.TemplateResponse(request, "applications/index.html", context)
 
 
@@ -594,7 +600,7 @@ async def create_application(
             )
 
     # Get user information from resume
-    contact_info = resume.parsed_sections.get("contact", {})
+    contact_info = contact_section(resume.parsed_sections)
 
     # Create application
     application_data = {

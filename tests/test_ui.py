@@ -243,3 +243,71 @@ class TestCsrfProtection:
         )
         assert resp.status_code == 303
         assert resp.headers["location"] == "/jobs"
+
+
+# ---------------------------------------------------------------------------
+# Applications list (renders plain dict rows, audit A-15)
+# ---------------------------------------------------------------------------
+
+
+class TestApplicationsPage:
+    async def _create_application(self, client: AsyncClient, job_title: str) -> None:
+        """Recruiter posts a job, then a seeker uploads a resume and applies."""
+        await _register_and_login_ui(
+            client, "ui-apprec@example.com", "ui-pass-123", is_recruiter=True
+        )
+        csrf = await _get_csrf_token(client, "/jobs/create")
+        resp = await client.post(
+            "/jobs/create",
+            data={
+                "title": job_title,
+                "description_text": "Python and SQL required",
+                "csrf_token": csrf,
+            },
+            follow_redirects=False,
+        )
+        assert resp.status_code == 303
+        job_id = resp.headers["location"].rsplit("/", 1)[-1]
+
+        await _register_and_login_ui(client, "ui-appseeker@example.com", "ui-pass-123")
+        csrf = await _get_csrf_token(client, "/resumes/create")
+        resp = await client.post(
+            "/resumes/create",
+            data={
+                "resume_text": "Jane Doe\nPython Developer\nEmail: jane@example.com\nPython SQL",
+                "csrf_token": csrf,
+            },
+            follow_redirects=False,
+        )
+        assert resp.status_code == 303
+        resume_id = resp.headers["location"].rsplit("/", 1)[-1]
+
+        job_page = await client.get(f"/jobs/{job_id}")
+        csrf = CSRF_INPUT_RE.search(job_page.text).group(1)
+        resp = await client.post(
+            "/applications/create",
+            data={"job_id": job_id, "resume_id": resume_id, "csrf_token": csrf},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 303
+
+    async def test_seeker_sees_job_and_resume_names(self, client: AsyncClient):
+        await self._create_application(client, "Listing Job Alpha")
+        resp = await client.get("/applications")
+        assert resp.status_code == 200
+        assert "Listing Job Alpha" in resp.text
+        assert "Jane Doe" in resp.text
+
+    async def test_recruiter_sees_applicant_name(self, client: AsyncClient):
+        await self._create_application(client, "Listing Job Beta")
+        # Log back in as the recruiter registered by _create_application.
+        resp = await client.post(
+            "/login",
+            data={"email": "ui-apprec@example.com", "password": "ui-pass-123"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 303
+        resp = await client.get("/applications")
+        assert resp.status_code == 200
+        assert "Listing Job Beta" in resp.text
+        assert "Jane Doe" in resp.text
