@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 from core.config import Settings, settings
+from core.i18n import BASE_LOCALE
 from core.i18n import SUPPORTED_LOCALES as I18N_LOCALES
 from db.database import Base, async_session_factory, get_db
 
@@ -41,6 +42,14 @@ class TestSettings:
 
     def test_supported_locales_match_i18n(self) -> None:
         assert settings.SUPPORTED_LOCALES == I18N_LOCALES
+
+    def test_supported_locales_derived_from_i18n_not_aliased(self) -> None:
+        """Settings defaults derive from i18n (single source of truth) as a copy."""
+        s = Settings(_env_file=None)  # type: ignore[call-arg]
+        assert s.SUPPORTED_LOCALES is not I18N_LOCALES
+        s.SUPPORTED_LOCALES.append("xx")
+        assert "xx" not in I18N_LOCALES
+        assert s.DEFAULT_LOCALE == BASE_LOCALE
 
 
 class TestDatabase:

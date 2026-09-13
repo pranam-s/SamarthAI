@@ -1,8 +1,11 @@
 import secrets
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from core.i18n import BASE_LOCALE
+from core.i18n import SUPPORTED_LOCALES as I18N_SUPPORTED_LOCALES
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -37,29 +40,9 @@ class Settings(BaseSettings):
 
     PROMPTS_DIR: str = str(BASE_DIR / "prompts")
 
-    DEFAULT_LOCALE: str = "en"
-    SUPPORTED_LOCALES: list[str] = [
-        "en",
-        "hi",
-        "bn",
-        "te",
-        "mr",
-        "ta",
-        "ur",
-        "gu",
-        "kn",
-        "ml",
-        "es",
-        "fr",
-        "ar",
-        "zh",
-        "pt",
-        "de",
-        "ru",
-        "ja",
-        "ko",
-        "it",
-    ]
+    DEFAULT_LOCALE: str = BASE_LOCALE
+    # Derived from core/i18n.py, the domain owner of the locale list (audit A-11).
+    SUPPORTED_LOCALES: list[str] = Field(default_factory=lambda: list(I18N_SUPPORTED_LOCALES))
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
