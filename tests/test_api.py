@@ -48,6 +48,25 @@ async def test_register_duplicate_email(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_register_password_below_minimum_rejected(client: AsyncClient) -> None:
+    resp = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "shortpw@example.com", "password": "short", "full_name": "Short PW"},
+    )
+    assert resp.status_code == 422
+    assert "at least 8" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_register_password_at_minimum_accepted(client: AsyncClient) -> None:
+    resp = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "minpw@example.com", "password": "12345678", "full_name": "Min PW"},
+    )
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_login_success(client: AsyncClient) -> None:
     # Register first
     await client.post(

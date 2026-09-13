@@ -131,11 +131,19 @@ class TestAuthFlow:
         assert resp.status_code == 400
 
     async def test_duplicate_register_rejected(self, client: AsyncClient):
-        payload = {"email": "ui-dup@example.com", "full_name": "X", "password": "pass-1"}
+        payload = {"email": "ui-dup@example.com", "full_name": "X", "password": "pass-12345"}
         first = await client.post("/register", data=payload)
         assert first.status_code == 303
         second = await client.post("/register", data=payload)
         assert second.status_code == 400
+
+    async def test_register_short_password_rejected(self, client: AsyncClient):
+        resp = await client.post(
+            "/register",
+            data={"email": "ui-shortpw@example.com", "full_name": "X", "password": "short"},
+        )
+        assert resp.status_code == 400
+        assert "at least 8" in resp.text
 
 
 # ---------------------------------------------------------------------------

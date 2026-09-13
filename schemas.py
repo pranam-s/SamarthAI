@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
+
+from core.security import MIN_PASSWORD_LENGTH
 
 
 class TokenPayload(BaseModel):
@@ -25,6 +27,14 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+
+    @field_validator("password")
+    @classmethod
+    def password_meets_minimum_length(cls, value: str) -> str:
+        """Enforce the shared password policy on every registration path."""
+        if len(value) < MIN_PASSWORD_LENGTH:
+            raise ValueError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
+        return value
 
 
 class UserUpdate(UserBase):

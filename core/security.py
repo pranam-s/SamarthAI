@@ -9,6 +9,7 @@ from core.config import settings
 
 ALGORITHM = "HS256"
 CSRF_SALT = "samarth-csrf"
+MIN_PASSWORD_LENGTH = 8
 
 
 def _csrf_serializer() -> URLSafeTimedSerializer:

@@ -50,13 +50,21 @@ class TestTokenSchemas:
 
 class TestUserSchemas:
     def test_user_create(self) -> None:
-        u = UserCreate(email="a@b.com", password="secret", full_name="Ab", is_recruiter=False)
+        u = UserCreate(email="a@b.com", password="super-secret", full_name="Ab", is_recruiter=False)
         assert u.email == "a@b.com"
-        assert u.password == "secret"
+        assert u.password == "super-secret"
 
     def test_user_create_invalid_email(self) -> None:
         with pytest.raises(ValidationError):
-            UserCreate(email="not-an-email", password="secret")
+            UserCreate(email="not-an-email", password="super-secret")
+
+    def test_user_create_password_below_minimum_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="at least 8"):
+            UserCreate(email="a@b.com", password="short")
+
+    def test_user_create_password_at_minimum_accepted(self) -> None:
+        u = UserCreate(email="a@b.com", password="12345678")
+        assert u.password == "12345678"
 
     def test_user_from_attributes(self) -> None:
         """User schema should work with from_attributes (ORM mode)."""

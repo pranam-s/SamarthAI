@@ -11,6 +11,7 @@ from api import get_current_user
 from core.config import settings
 from core.i18n import normalize_locale, translate
 from core.security import (
+    MIN_PASSWORD_LENGTH,
     create_access_token,
     create_csrf_token,
     decode_access_token,
@@ -147,6 +148,11 @@ async def register_submit(
     password: str = Form(...),
     is_recruiter: bool = Form(False),
 ):
+    if len(password) < MIN_PASSWORD_LENGTH:
+        context = await get_user_context(request)
+        context["error"] = f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
+        return templates.TemplateResponse(request, "auth/register.html", context, status_code=400)
+
     user = await user_service.get_user_by_email(db, email)
     if user:
         context = await get_user_context(request)
