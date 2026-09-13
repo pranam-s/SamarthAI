@@ -37,14 +37,6 @@ class UserCreate(UserBase):
         return value
 
 
-class UserUpdate(UserBase):
-    password: str | None = None
-    phone: str | None = None
-    bio: str | None = None
-    location: str | None = None
-    profile_picture_url: str | None = None
-
-
 class UserInDB(UserBase):
     model_config = ConfigDict(from_attributes=True)
 
@@ -64,49 +56,6 @@ class User(UserBase):
     updated_at: datetime | None = None
 
 
-class SkillBase(BaseModel):
-    name: str
-    proficiency: str | None = None
-    context: str | None = None
-
-
-class ExperienceBase(BaseModel):
-    role: str
-    company: str
-    start_date: str | None = None
-    end_date: str | None = None
-    description: str | None = None
-    achievements: list[str] | None = []
-
-
-class EducationBase(BaseModel):
-    institution: str
-    degree: str
-    field_of_study: str | None = None
-    start_date: str | None = None
-    end_date: str | None = None
-    gpa: str | None = None
-    extras: str | None = None
-
-
-class ProjectBase(BaseModel):
-    name: str
-    description: str | None = None
-    technologies: list[str] | None = []
-    url: str | None = None
-
-
-class CertificationBase(BaseModel):
-    name: str
-    issuer: str | None = None
-    date: str | None = None
-    expires: str | None = None
-
-
-class AchievementBase(BaseModel):
-    description: str | None = None
-
-
 class ResumeBase(BaseModel):
     user_id: int | None = None
     full_text: str | None = None
@@ -118,14 +67,6 @@ class ResumeBase(BaseModel):
     certifications: list[dict[str, Any]] | None = []
     achievements: list[dict[str, Any]] | None = []
     file_type: str | None = None
-
-
-class ResumeCreate(ResumeBase):
-    pass
-
-
-class ResumeUpdate(ResumeBase):
-    pass
 
 
 class Resume(ResumeBase):
@@ -205,13 +146,6 @@ class ApplicationBase(BaseModel):
 
 class ApplicationCreate(ApplicationBase):
     pass
-
-
-class ApplicationUpdate(BaseModel):
-    status: str | None = None
-    match_score: float | None = None
-    match_details: dict[str, Any] | None = None
-    feedback: dict[str, Any] | None = None
 
 
 class Application(ApplicationBase):

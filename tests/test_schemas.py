@@ -15,7 +15,7 @@ from schemas import (
     MatchResponse,
     MatchSections,
     Resume,
-    ResumeCreate,
+    ResumeUpload,
     Token,
     TokenPayload,
     User,
@@ -103,9 +103,10 @@ class TestUserSchemas:
 
 
 class TestResumeSchemas:
-    def test_resume_create_minimal(self) -> None:
-        r = ResumeCreate(full_text="Simple resume text", file_type="text")
-        assert r.full_text == "Simple resume text"
+    def test_resume_upload_minimal(self) -> None:
+        r = ResumeUpload(file_content="base64-content", file_type="txt", file_name="resume.txt")
+        assert r.file_content == "base64-content"
+        assert r.file_name == "resume.txt"
 
     def test_resume_from_attributes(self) -> None:
         now = datetime.now()
