@@ -1,11 +1,13 @@
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import uuid4
 
 import bcrypt
 import jwt
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from core.config import settings
+from core.revocation import token_denylist
 
 ALGORITHM = "HS256"
 CSRF_SALT = "samarth-csrf"
@@ -22,7 +24,7 @@ def create_access_token(subject: str | Any, expires_delta: timedelta | None = No
     else:
         expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    to_encode = {"exp": expire, "sub": str(subject)}
+    to_encode = {"exp": expire, "sub": str(subject), "jti": uuid4().hex}
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -34,8 +36,8 @@ def decode_access_token(token: str) -> dict:
 def decode_token_subject(token: str) -> str | None:
     """Decode a presented bearer/cookie JWT and return its ``sub`` claim.
 
-    Accepts an optional 'Bearer ' prefix; returns None for missing subject or
-    any invalid/expired/malformed token.
+    Accepts an optional 'Bearer ' prefix; returns None for missing subject, any
+    invalid/expired/malformed token, or a token revoked by ``jti``.
     """
     if token.startswith("Bearer "):
         token = token[7:]
@@ -43,8 +45,30 @@ def decode_token_subject(token: str) -> str | None:
         payload = decode_access_token(token)
     except jwt.InvalidTokenError:
         return None
+    jti = payload.get("jti")
+    if jti is not None and token_denylist.is_revoked(str(jti)):
+        return None
     sub = payload.get("sub")
     return str(sub) if sub is not None else None
+
+
+def revoke_token(token: str) -> bool:
+    """Revoke a presented token by its ``jti`` until the token's own expiry.
+
+    Accepts an optional 'Bearer ' prefix. Returns False for invalid tokens or
+    legacy tokens without a ``jti`` claim, which cannot be revoked.
+    """
+    if token.startswith("Bearer "):
+        token = token[7:]
+    try:
+        payload = decode_access_token(token)
+    except jwt.InvalidTokenError:
+        return False
+    jti = payload.get("jti")
+    if not jti:
+        return False
+    token_denylist.revoke(str(jti), float(payload.get("exp", 0)))
+    return True
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

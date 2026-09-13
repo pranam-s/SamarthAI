@@ -14,6 +14,7 @@ from core.security import (
     create_access_token,
     decode_token_subject,
     get_password_hash,
+    revoke_token,
     verify_password,
 )
 from db.database import get_db
@@ -143,6 +144,17 @@ async def get_current_user_profile(
 ) -> Any:
     """Return the profile of the currently authenticated user."""
     return current_user
+
+
+@router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    request: Request,
+    token: Annotated[str | None, Depends(oauth2_scheme)],
+) -> None:
+    """Revoke the presented bearer/cookie token for the rest of its lifetime."""
+    raw_token = token or request.cookies.get(settings.AUTH_COOKIE_NAME)
+    if not raw_token or not revoke_token(raw_token):
+        raise _unauthenticated()
 
 
 @router.post("/resumes", response_model=Resume)

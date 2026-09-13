@@ -15,6 +15,7 @@ from core.security import (
     create_csrf_token,
     decode_token_subject,
     get_password_hash,
+    revoke_token,
     verify_csrf_token,
     verify_password,
 )
@@ -171,7 +172,10 @@ async def register_submit(
 
 
 @router.get("/logout")
-async def logout():
+async def logout(request: Request):
+    cookie_token = request.cookies.get(settings.AUTH_COOKIE_NAME)
+    if cookie_token:
+        revoke_token(cookie_token)
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     response.delete_cookie(key=settings.AUTH_COOKIE_NAME)
     return response
