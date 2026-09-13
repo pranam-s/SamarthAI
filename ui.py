@@ -114,7 +114,7 @@ async def login_submit(
     user = await user_service.get_user_by_email(db, email)
     if not user or not user.is_active or not verify_password(password, user.hashed_password):
         context = await get_user_context(request)
-        context["error"] = "Invalid email or password"
+        context["error"] = context["t"]("auth.error.invalid_credentials")
         return templates.TemplateResponse(request, "auth/login.html", context, status_code=400)
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -150,13 +150,13 @@ async def register_submit(
 ):
     if len(password) < MIN_PASSWORD_LENGTH:
         context = await get_user_context(request)
-        context["error"] = f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
+        context["error"] = context["t"]("auth.error.password_too_short")
         return templates.TemplateResponse(request, "auth/register.html", context, status_code=400)
 
     user = await user_service.get_user_by_email(db, email)
     if user:
         context = await get_user_context(request)
-        context["error"] = "Email already registered"
+        context["error"] = context["t"]("auth.error.email_registered")
         return templates.TemplateResponse(request, "auth/register.html", context, status_code=400)
 
     user_data = {"email": email, "full_name": full_name, "is_recruiter": is_recruiter}
@@ -280,7 +280,7 @@ async def create_resume_submit(
 
     if not resume_file and not resume_text:
         context = await get_user_context(request, current_user)
-        context["error"] = "Either file or text must be provided"
+        context["error"] = context["t"]("resumes.error.provide_input")
         return templates.TemplateResponse(request, "resumes/create.html", context, status_code=400)
 
     try:
@@ -294,7 +294,7 @@ async def create_resume_submit(
     except Exception:
         logger.exception("Resume processing failed")
         context = await get_user_context(request, current_user)
-        context["error"] = "Error processing resume. Please check the file and try again."
+        context["error"] = context["t"]("resumes.error.process")
         return templates.TemplateResponse(request, "resumes/create.html", context, status_code=400)
 
 
@@ -399,7 +399,7 @@ async def create_job_submit(
     except Exception:
         logger.exception("Job creation failed")
         context = await get_user_context(request, current_user)
-        context["error"] = "Error processing job. Please check the description and try again."
+        context["error"] = context["t"]("jobs.error.process")
         context["title"] = title
         context["description_text"] = description_text
         return templates.TemplateResponse(request, "jobs/create.html", context, status_code=400)
@@ -492,7 +492,7 @@ async def edit_job_submit(
     except Exception:
         logger.exception("Job update failed")
         context = await get_user_context(request, current_user)
-        context["error"] = "Error updating job. Please check the description and try again."
+        context["error"] = context["t"]("jobs.error.update")
         context["job"] = job
         context["title"] = title
         context["description_text"] = description_text

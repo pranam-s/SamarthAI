@@ -129,6 +129,16 @@ class TestAuthFlow:
             data={"email": "ui-wrong@example.com", "password": "wrong-pass"},
         )
         assert resp.status_code == 400
+        assert "Invalid email or password" in resp.text
+
+    async def test_login_error_localized(self, client: AsyncClient):
+        client.cookies.set("locale", "es")
+        resp = await client.post(
+            "/login",
+            data={"email": "nobody@example.com", "password": "whatever1"},
+        )
+        assert resp.status_code == 400
+        assert "Correo electrónico o contraseña no válidos" in resp.text
 
     async def test_duplicate_register_rejected(self, client: AsyncClient):
         payload = {"email": "ui-dup@example.com", "full_name": "X", "password": "pass-12345"}
@@ -144,6 +154,15 @@ class TestAuthFlow:
         )
         assert resp.status_code == 400
         assert "at least 8" in resp.text
+
+    async def test_duplicate_register_error_localized(self, client: AsyncClient):
+        payload = {"email": "ui-i18n@example.com", "full_name": "X", "password": "pass-12345"}
+        first = await client.post("/register", data=payload)
+        assert first.status_code == 303
+        client.cookies.set("locale", "fr")
+        second = await client.post("/register", data=payload)
+        assert second.status_code == 400
+        assert "déjà enregistré" in second.text
 
 
 # ---------------------------------------------------------------------------

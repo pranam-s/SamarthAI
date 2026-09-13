@@ -12,6 +12,16 @@ from core.i18n import (
     translate,
 )
 
+UI_ERROR_KEYS = (
+    "auth.error.invalid_credentials",
+    "auth.error.email_registered",
+    "auth.error.password_too_short",
+    "resumes.error.provide_input",
+    "resumes.error.process",
+    "jobs.error.process",
+    "jobs.error.update",
+)
+
 # ---------------------------------------------------------------------------
 # normalize_locale
 # ---------------------------------------------------------------------------
@@ -107,3 +117,15 @@ class TestTranslationsStructure:
 
     def test_en_translations_nonempty(self) -> None:
         assert len(EN_TRANSLATIONS) > 100
+
+    def test_ui_error_keys_localized_in_every_override(self) -> None:
+        """UI error strings must be translated per locale, not left to EN fallback (audit A-09)."""
+        for locale in SUPPORTED_LOCALES:
+            if locale == BASE_LOCALE:
+                continue
+            overrides = LOCALE_OVERRIDES[locale]
+            for key in UI_ERROR_KEYS:
+                assert key in overrides, f"Locale {locale!r} missing override for {key!r}"
+                assert overrides[key] != EN_TRANSLATIONS[key], (
+                    f"Locale {locale!r} copies EN text for {key!r}"
+                )
