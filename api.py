@@ -9,6 +9,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
+from core.ratelimit import login_limiter
 from core.security import (
     create_access_token,
     decode_token_subject,
@@ -87,9 +88,19 @@ async def get_current_user(
 
 @router.post("/auth/login", response_model=Token)
 async def login_access_token(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> Any:
+    client_ip = request.client.host if request.client else "unknown"
+    retry_after = login_limiter.hit(f"{client_ip}|{form_data.username}")
+    if retry_after is not None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts; try again later",
+            headers={"Retry-After": str(retry_after)},
+        )
+
     user = await user_service.get_user_by_email(db, form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
