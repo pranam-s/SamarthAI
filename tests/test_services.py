@@ -7,8 +7,10 @@ import os
 
 import pytest
 from fastapi import HTTPException, UploadFile
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
+from models import Resume as ResumeModel
 from services import AIService, ResumeService, contact_section, extract_skill_names
 
 # ---------------------------------------------------------------------------
@@ -412,3 +414,30 @@ class TestProcessResumeFileHardening:
 
 def ai_service_for_tests() -> AIService:
     return AIService()
+
+
+# ---------------------------------------------------------------------------
+# ResumeService.delete_resume
+# ---------------------------------------------------------------------------
+
+
+class TestDeleteResume:
+    @pytest.fixture
+    def resume_service(self) -> ResumeService:
+        return ResumeService(ai_service_for_tests())
+
+    async def test_missing_file_still_deletes_row(
+        self, resume_service: ResumeService, db_session: AsyncSession
+    ) -> None:
+        """A vanished file must not block the DB delete (audit A-17)."""
+        resume = ResumeModel(
+            user_id=1,
+            full_text="text",
+            parsed_sections={},
+            file_path="./uploads/already-gone.txt",
+            file_type="txt",
+        )
+        db_session.add(resume)
+        await db_session.commit()
+
+        assert await resume_service.delete_resume(db_session, resume.id) is True

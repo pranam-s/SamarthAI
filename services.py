@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import aiofiles
+import aiofiles.os
 from docx import Document
 from fastapi import HTTPException, UploadFile, status
 from google import genai
@@ -604,8 +605,9 @@ class ResumeService:
         resume = await self.get_resume(db, resume_id)
         if not resume:
             return False
-        if resume.file_path and os.path.exists(resume.file_path):
-            os.remove(resume.file_path)
+        if resume.file_path:
+            with contextlib.suppress(FileNotFoundError):
+                await aiofiles.os.remove(resume.file_path)
         await db.execute(delete(ResumeModel).where(ResumeModel.id == resume_id))
         await db.commit()
         return True
