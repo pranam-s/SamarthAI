@@ -70,6 +70,7 @@ deprecated = "ignore"
 testpaths = ["tests"]
 addopts = "-q"
 asyncio_mode = "auto"
+pythonpath = ["."]
 
 [tool.coverage.run]
 source = ["."]

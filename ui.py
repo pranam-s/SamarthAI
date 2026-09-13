@@ -11,7 +11,6 @@ from api import get_current_user
 from core.config import settings
 from core.i18n import normalize_locale, translate
 from core.security import (
-    MIN_PASSWORD_LENGTH,
     create_access_token,
     create_csrf_token,
     decode_token_subject,
@@ -21,6 +20,7 @@ from core.security import (
 )
 from db.database import get_db
 from models import User
+from schemas import MIN_PASSWORD_LENGTH
 from services import (
     contact_section,
     job_service,

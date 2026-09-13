@@ -3,7 +3,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
-from core.security import MIN_PASSWORD_LENGTH
+# Password policy lives in the I/O contract layer. Do not move it into
+# core.security: schemas must stay import-light because pytest-cov imports
+# --cov targets before the test sys.path is configured, and pulling in
+# bcrypt here aborts the interpreter (PyO3 double-init, audit A-25).
+MIN_PASSWORD_LENGTH = 8
 
 
 class TokenPayload(BaseModel):

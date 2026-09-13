@@ -1,20 +1,14 @@
 from __future__ import annotations
 
-import sys
 from collections.abc import AsyncIterator
-from pathlib import Path
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-from db.database import Base, get_db  # noqa: E402
-from main import app  # noqa: E402
+from db.database import Base, get_db
+from main import app
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
