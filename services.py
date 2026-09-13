@@ -38,6 +38,19 @@ def _load_prompt(name: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def extract_skill_names(skills: Any) -> list[str]:
+    """Extract lowercased skill names from a list of skill dicts or plain strings."""
+    if not isinstance(skills, list):
+        return []
+    values: list[str] = []
+    for skill in skills:
+        if isinstance(skill, dict) and skill.get("name"):
+            values.append(str(skill["name"]).strip().lower())
+        elif isinstance(skill, str):
+            values.append(skill.strip().lower())
+    return values
+
+
 class AIService:
     """Handles all AI provider interactions with Google GenAI primary and OpenRouter fallback."""
 
@@ -135,7 +148,8 @@ class AIService:
             logger.exception("OpenRouter call failed")
             return None
 
-    async def _call_text(self, prompt: str, file_path: str | None = None) -> str | None:
+    async def call_text(self, prompt: str, file_path: str | None = None) -> str | None:
+        """Run the provider fallback chain (Google primary, OpenRouter fallback)."""
         providers = [settings.AI_PRIMARY_PROVIDER, settings.AI_FALLBACK_PROVIDER]
         for provider in providers:
             if provider == "google":
@@ -151,7 +165,7 @@ class AIService:
         return None
 
     async def call_gemini(self, prompt: str, file_path: str | None = None) -> dict[str, Any] | str:
-        text = await self._call_text(prompt, file_path=file_path)
+        text = await self.call_text(prompt, file_path=file_path)
         if not text:
             return {"error": "No provider response available"}
 
@@ -177,7 +191,7 @@ class AIService:
 
     async def extract_resume_from_pdf(self, file_path: str) -> str:
         prompt = _load_prompt("extract_pdf")
-        response = await self._call_text(prompt, file_path=file_path)
+        response = await self.call_text(prompt, file_path=file_path)
         if response:
             return response
         return self._extract_text_from_pdf_locally(file_path)
@@ -252,7 +266,7 @@ class AIService:
 
     async def parse_resume(self, text: str) -> dict[str, Any]:
         prompt = _load_prompt("parse_resume").replace("{resume_text}", text)
-        response = await self._call_text(prompt)
+        response = await self.call_text(prompt)
         if response:
             try:
                 parsed = self.parse_json(response)
@@ -296,7 +310,7 @@ class AIService:
 
     async def parse_job_description(self, text: str) -> dict[str, Any]:
         prompt = _load_prompt("parse_job").replace("{job_text}", text)
-        response = await self._call_text(prompt)
+        response = await self.call_text(prompt)
         if response:
             try:
                 parsed = self.parse_json(response)
@@ -306,24 +320,12 @@ class AIService:
                 logger.warning("Failed to parse AI job response, using heuristic")
         return self._default_job_payload(text)
 
-    @staticmethod
-    def _extract_skill_names(skills: Any) -> list[str]:
-        if not isinstance(skills, list):
-            return []
-        values: list[str] = []
-        for skill in skills:
-            if isinstance(skill, dict) and skill.get("name"):
-                values.append(str(skill["name"]).strip().lower())
-            elif isinstance(skill, str):
-                values.append(skill.strip().lower())
-        return values
-
     def _heuristic_match_score(
         self, resume_data: dict[str, Any], job_data: dict[str, Any]
     ) -> tuple[float, dict[str, Any]]:
-        resume_skills = set(self._extract_skill_names(resume_data.get("skills", [])))
-        required_skills = set(self._extract_skill_names(job_data.get("required_skills", [])))
-        preferred_skills = set(self._extract_skill_names(job_data.get("preferred_skills", [])))
+        resume_skills = set(extract_skill_names(resume_data.get("skills", [])))
+        required_skills = set(extract_skill_names(job_data.get("required_skills", [])))
+        preferred_skills = set(extract_skill_names(job_data.get("preferred_skills", [])))
 
         matched_required = sorted(required_skills & resume_skills)
         missing_required = sorted(required_skills - resume_skills)
@@ -402,7 +404,7 @@ class AIService:
             .replace("{job_data}", json.dumps(job_data))
         )
 
-        response = await self._call_text(prompt)
+        response = await self.call_text(prompt)
         if response:
             try:
                 parsed = self.parse_json(response)
@@ -434,7 +436,7 @@ class AIService:
         )[:10]
 
         prompt = _load_prompt("feedback").replace("{match_details}", json.dumps(match_details))
-        response = await self._call_text(prompt)
+        response = await self.call_text(prompt)
         if response:
             try:
                 parsed = self.parse_json(response)
@@ -791,11 +793,11 @@ class JobService:
         if not job:
             return {}
 
-        resume_skills = set(self.ai._extract_skill_names(resume.skills or []))
+        resume_skills = set(extract_skill_names(resume.skills or []))
         required_skills_raw = job.required_skills or []
         preferred_skills_raw = job.preferred_skills or []
-        required_skills = set(self.ai._extract_skill_names(required_skills_raw))
-        preferred_skills = set(self.ai._extract_skill_names(preferred_skills_raw))
+        required_skills = set(extract_skill_names(required_skills_raw))
+        preferred_skills = set(extract_skill_names(preferred_skills_raw))
 
         matched = sorted(resume_skills & (required_skills | preferred_skills))
         missing_req = sorted(required_skills - resume_skills)
@@ -854,7 +856,7 @@ class JobService:
                 .replace("{required_skills}", json.dumps(sorted(required_skills)))
                 .replace("{preferred_skills}", json.dumps(sorted(preferred_skills)))
             )
-            response = await self.ai._call_text(prompt)
+            response = await self.ai.call_text(prompt)
             if response:
                 parsed = self.ai.parse_json(response)
                 if isinstance(parsed, dict):

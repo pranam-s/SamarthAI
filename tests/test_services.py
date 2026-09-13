@@ -9,7 +9,7 @@ import pytest
 from fastapi import HTTPException, UploadFile
 
 from core.config import settings
-from services import AIService, ResumeService
+from services import AIService, ResumeService, extract_skill_names
 
 # ---------------------------------------------------------------------------
 # AIService.parse_json
@@ -54,36 +54,36 @@ class TestParseJson:
 
 
 # ---------------------------------------------------------------------------
-# AIService._extract_skill_names
+# services.extract_skill_names
 # ---------------------------------------------------------------------------
 
 
 class TestExtractSkillNames:
-    """Test the static skill-name extraction helper."""
+    """Test the module-level skill-name extraction helper."""
 
     def test_extracts_from_dict_list(self) -> None:
         skills = [{"name": "Python"}, {"name": "SQL"}, {"name": "Docker"}]
-        result = AIService._extract_skill_names(skills)
+        result = extract_skill_names(skills)
         assert result == ["python", "sql", "docker"]
 
     def test_extracts_from_string_list(self) -> None:
         skills = ["React", "TypeScript"]
-        result = AIService._extract_skill_names(skills)
+        result = extract_skill_names(skills)
         assert result == ["react", "typescript"]
 
     def test_returns_empty_for_non_list(self) -> None:
-        assert AIService._extract_skill_names(None) == []
-        assert AIService._extract_skill_names("python") == []
-        assert AIService._extract_skill_names(42) == []
+        assert extract_skill_names(None) == []
+        assert extract_skill_names("python") == []
+        assert extract_skill_names(42) == []
 
     def test_skips_items_without_name(self) -> None:
         skills = [{"name": "Go"}, {"proficiency": "expert"}, {"name": "Rust"}]
-        result = AIService._extract_skill_names(skills)
+        result = extract_skill_names(skills)
         assert result == ["go", "rust"]
 
     def test_strips_whitespace(self) -> None:
         skills = [{"name": "  Python  "}, " SQL "]
-        result = AIService._extract_skill_names(skills)
+        result = extract_skill_names(skills)
         assert result == ["python", "sql"]
 
 
