@@ -19,6 +19,8 @@ Production-oriented FastAPI platform for resume management, AI-assisted job matc
   - Signed JWT access tokens with configurable expiry
   - CSRF protection on all authenticated write forms
   - HTTP-only secure cookies with configurable `SameSite`
+  - 8-character minimum password; standard error semantics (401 unauthenticated
+    with `WWW-Authenticate: Bearer`, 403 forbidden, 409 duplicate registration)
 - **Skills Gap Analysis** — compare resume skills to job requirements, get a gap score and learning path.
 - **Job management** — post, edit, and delete jobs (recruiters); browse and apply (job seekers).
 - **Localization** — 20 locales (10 Indian + 10 global), fully translated including new features.
@@ -132,7 +134,7 @@ All API endpoints are prefixed with `/api/v1/`.
 uv run ruff format --check .   # formatting
 uv run ruff check .            # linting
 uv run ty check .              # type checking (blocking in CI)
-uv run pytest tests/ -v        # 153 tests
+uv run pytest tests/ -v        # 180 tests
 ```
 
 CI enforces a coverage gate of ≥95% on the fully-measurable core modules
@@ -166,7 +168,7 @@ The compose file includes a health check, named volumes for uploads and the data
 ├── prompts/             Externalized AI prompt templates (.md)
 ├── templates/           Jinja2 SSR templates
 ├── static/              Static assets
-├── tests/               153 tests (services, security, i18n, config, database, API, UI)
+├── tests/               180 tests (services, security, i18n, config, database, API, UI)
 ├── docs/                Audit, PRD, architecture, evaluation, style guides
 ├── .env.example         Example environment configuration
 ├── .github/workflows/   CI/CD pipeline (quality + test + docker)

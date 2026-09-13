@@ -1,0 +1,65 @@
+# Changelog
+
+All notable changes to Samarth AI are documented here. Format follows
+[Keep a Changelog](https://keepachangelog.com/); versioning is
+[SemVer](https://semver.org/)-flavoured. Local-only repo: the owner pushes.
+
+## [0.5.0] - 2026-09-14
+
+Audit-remediation pass (docs/AUDIT.md A-08..A-18, A-25). Breaking API
+behaviour changes are listed first.
+
+### Changed (breaking for API consumers)
+
+- Auth failures for missing/invalid bearer credentials now return
+  **401 Unauthorized** with a `WWW-Authenticate: Bearer` challenge instead of
+  403 (audit A-08). 403 remains reserved for authenticated-but-forbidden
+  requests (inactive user, non-owner, wrong role).
+- Duplicate registration now returns **409 Conflict** instead of 400 (A-08).
+- Registration now enforces a **minimum password length of 8** on both the API
+  (`422` from the `UserCreate` validator) and the UI form (`400` with a
+  rendered error) (A-10).
+
+### Fixed
+
+- UI error messages (login, registration, resume/job processing) are routed
+  through the i18n pipeline and translated in all 20 locales instead of being
+  hardcoded English (A-09).
+- Applications list renders plain dict rows from two batch queries instead of
+  mutating ORM instances with per-id fetch loops (A-15).
+- Resume lists, resume details and the skills-gap selector now actually render
+  parsed contact info; previously the nested payload shape made every read
+  miss and fall back to "Unnamed Resume" (A-15 follow-up).
+- Resume deletion removes files off the event loop (`aiofiles`) and tolerates
+  an already-vanished file (A-17).
+- Static assets resolve from the repository root instead of the process CWD
+  (A-18).
+
+### Removed
+
+- Ten unused schemas (`UserUpdate`, `ResumeCreate`, `ResumeUpdate`,
+  `ApplicationUpdate`, `SkillBase`, `ExperienceBase`, `EducationBase`,
+  `ProjectBase`, `CertificationBase`, `AchievementBase`) — dead code (A-12).
+
+### Refactored
+
+- `SUPPORTED_LOCALES`/`DEFAULT_LOCALE` derive from `core/i18n.py`, the domain
+  owner, removing a drift-prone duplicate (A-11).
+- No cross-class private access in services: `extract_skill_names()` is a
+  module function and the provider fallback chain is public
+  `AIService.call_text()` (A-14).
+- Single shared `core/security.decode_token_subject()` replaces the duplicated
+  JWT decode blocks in api.py/ui.py (A-16).
+
+### Tooling
+
+- Restored multi-target pytest-cov runs: password policy constant kept inside
+  schemas.py (import-light) and conftest's runtime `sys.path` hack replaced by
+  pytest `pythonpath` ini (A-25).
+
+## [0.4.0] - 2026-09-09
+
+Initial audited release: FastAPI + Jinja SSR platform, AI provider routing
+with heuristic fallbacks, 20-locale i18n, upload hardening, CSRF, JWT auth,
+CI with blocking type check and coverage gate. See docs/AUDIT.md (A-01..A-24)
+and docs/EVALUATION.md.
