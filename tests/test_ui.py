@@ -103,9 +103,9 @@ class TestAnonymousAccess:
         assert resp.status_code == 200
 
     async def test_protected_page_redirects_without_login(self, client: AsyncClient):
-        # UI routes use API get_current_user, which raises 403 for anonymous users.
+        # UI routes use API get_current_user, which raises 401 for anonymous users.
         resp = await client.get("/resumes")
-        assert resp.status_code in (303, 403)
+        assert resp.status_code in (303, 401)
 
 
 # ---------------------------------------------------------------------------

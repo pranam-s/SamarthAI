@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from services import user_service
 
 # ---------------------------------------------------------------------------
 # Auth endpoints
@@ -40,7 +43,8 @@ async def test_register_duplicate_email(client: AsyncClient) -> None:
     assert resp1.status_code == 200
 
     resp2 = await client.post("/api/v1/auth/register", json=payload)
-    assert resp2.status_code == 400
+    assert resp2.status_code == 409
+    assert "already exists" in resp2.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -247,7 +251,8 @@ async def test_unauthenticated_create_resume_fails(client: AsyncClient) -> None:
         "/api/v1/resumes",
         json={"full_text": "No auth", "file_type": "text"},
     )
-    assert resp.status_code == 403
+    assert resp.status_code == 401
+    assert resp.headers["www-authenticate"] == "Bearer"
 
 
 @pytest.mark.asyncio
@@ -256,7 +261,8 @@ async def test_unauthenticated_create_job_fails(client: AsyncClient) -> None:
         "/api/v1/jobs",
         json={"title": "NoAuth", "description_text": "Fail"},
     )
-    assert resp.status_code == 403
+    assert resp.status_code == 401
+    assert resp.headers["www-authenticate"] == "Bearer"
 
 
 # ---------------------------------------------------------------------------
@@ -501,7 +507,8 @@ async def test_skills_gap_unauthenticated(client: AsyncClient) -> None:
         "/api/v1/skills-gap",
         json={"resume_id": 1, "job_id": 1},
     )
-    assert resp.status_code == 403
+    assert resp.status_code == 401
+    assert resp.headers["www-authenticate"] == "Bearer"
 
 
 # ---------------------------------------------------------------------------
@@ -667,8 +674,37 @@ async def test_get_me_authenticated(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_get_me_unauthenticated(client: AsyncClient) -> None:
-    """GET /auth/me without a token should return 403."""
+    """GET /auth/me without a token should return 401 with a WWW-Authenticate challenge."""
     resp = await client.get("/api/v1/auth/me")
+    assert resp.status_code == 401
+    assert resp.headers["www-authenticate"] == "Bearer"
+
+
+@pytest.mark.asyncio
+async def test_get_me_invalid_token_unauthorized(client: AsyncClient) -> None:
+    """A malformed bearer token is unauthenticated (401), not forbidden."""
+    resp = await client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": "Bearer not-a-real-token"},
+    )
+    assert resp.status_code == 401
+    assert resp.headers["www-authenticate"] == "Bearer"
+
+
+@pytest.mark.asyncio
+async def test_get_me_inactive_user_forbidden(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """A valid token for a deactivated user is authenticated but forbidden (403, not 401)."""
+    email = "inactive@e.com"
+    headers = await _register_and_login(client, email=email)
+
+    user = await user_service.get_user_by_email(db_session, email)
+    assert user is not None
+    user.is_active = False
+    await db_session.commit()
+
+    resp = await client.get("/api/v1/auth/me", headers=headers)
     assert resp.status_code == 403
 
 

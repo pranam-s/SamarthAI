@@ -40,6 +40,15 @@ router = APIRouter(prefix=settings.API_V1_STR)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
 
 
+def _unauthenticated() -> HTTPException:
+    """Build a 401 for missing or invalid credentials (bearer auth convention)."""
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
 async def get_current_user(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -49,10 +58,7 @@ async def get_current_user(
     selected_token = token or raw_cookie_token
 
     if not selected_token:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Could not validate credentials",
-        )
+        raise _unauthenticated()
 
     if selected_token.startswith("Bearer "):
         selected_token = selected_token.replace("Bearer ", "", 1)
@@ -61,23 +67,14 @@ async def get_current_user(
         payload = jwt.decode(selected_token, settings.SECRET_KEY, algorithms=[ALGORITHM])
         token_data = TokenPayload(**payload)
     except (jwt.InvalidTokenError, ValidationError) as err:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Could not validate credentials",
-        ) from err
+        raise _unauthenticated() from err
 
     if token_data.sub is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Could not validate credentials",
-        )
+        raise _unauthenticated()
     try:
         user_id = int(token_data.sub)
     except (ValueError, TypeError) as err:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Could not validate credentials",
-        ) from err
+        raise _unauthenticated() from err
 
     user = await user_service.get_user_by_id(db, user_id)
     if not user:
@@ -124,7 +121,7 @@ async def register_user(user_in: UserCreate, db: Annotated[AsyncSession, Depends
     user = await user_service.get_user_by_email(db, user_in.email)
     if user:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="User with this email already exists",
         )
 
