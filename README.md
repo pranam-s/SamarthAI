@@ -104,8 +104,9 @@ All API endpoints are prefixed with `/api/v1/`.
 | Method | Endpoint | Description |
 |---|---|---|
 | POST | `/auth/register` | Register user |
-| POST | `/auth/login` | Login, returns JWT |
+| POST | `/auth/login` | Login, returns JWT (rate-limited per IP + username; 429 + `Retry-After` when exceeded) |
 | GET | `/auth/me` | Current user info |
+| POST | `/auth/logout` | Revoke the presented JWT for the rest of its lifetime |
 | POST | `/resumes/` | Create resume from text |
 | GET | `/resumes/` | List resumes |
 | GET | `/resumes/{id}` | Get resume |
@@ -198,6 +199,8 @@ See `.env.example` for the full list. Key variables:
 | `OPENROUTER_API_KEY` | — | OpenRouter API key (fallback) |
 | `DATABASE_URL` | SQLite | Async SQLAlchemy URL |
 | `COOKIE_SECURE` | `false` | Set `true` in production (HTTPS) |
+| `LOGIN_RATE_LIMIT_ATTEMPTS` | `5` | Failed-login burst allowance per IP + username |
+| `LOGIN_RATE_LIMIT_WINDOW_SECONDS` | `300` | Sliding window for the login limiter (in-memory: per worker, reset on restart) |
 | `CORS_ORIGINS` | localhost | Comma-separated allowed origins |
 | `DEFAULT_LOCALE` | `en` | Default UI locale |
 | `AI_THINKING_BUDGET` | `8192` | Gemini thinking token budget |

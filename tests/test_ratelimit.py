@@ -7,7 +7,7 @@ from collections.abc import Iterator
 import pytest
 from httpx import AsyncClient
 
-from core.ratelimit import SlidingWindowLimiter, login_limiter
+from core.ratelimit import SlidingWindowLimiter, _monotonic, login_limiter
 
 
 class FakeClock:
@@ -98,6 +98,20 @@ class TestSlidingWindowLimiter:
         limiter.reset_all()
         assert limiter.hit("a") is None
         assert limiter.hit("b") is None
+
+    def test_periodic_sweep_drops_expired_keys(
+        self, limiter: SlidingWindowLimiter, clock: FakeClock
+    ) -> None:
+        limiter.hit("hot")
+        for i in range(126):
+            limiter.hit(f"churn{i}")
+        clock.advance(61)  # every record above is now expired
+        limiter.hit("trigger")  # 128th hit: the sweep drops the expired keys
+        assert limiter.hit("trigger") is None
+        assert limiter.hit("hot") is None
+
+    def test_default_clock_is_monotonic_time(self) -> None:
+        assert isinstance(_monotonic(), float)
 
 
 async def _register(client: AsyncClient, email: str) -> None:

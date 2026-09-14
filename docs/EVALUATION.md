@@ -69,7 +69,8 @@ permission matrix, UI auth/CSRF flows, and upload hardening).
 ## Limitations
 
 1. **No DB migrations.** `create_all` only; column changes require manual
-   migration (Alembic adoption is the top infra TODO).
+   migration (A-28; deferred 2026-09-14 with exact adoption steps recorded in
+   docs/STATUS.md).
 2. **Match scoring is LLM-dependent for nuance.** Heuristics are coarse
    (set intersection + fixed weights 0.6/0.3/0.1); scores without keys are
    directional, not calibrated.
@@ -79,9 +80,17 @@ permission matrix, UI auth/CSRF flows, and upload hardening).
 4. **Localization of dynamic errors.** Route-level error strings in `ui.py`
    bypass the `t()` pipeline (A-09); templates are translated, server
    validation messages are English-only.
-5. **No rate limiting / account lockout** on login or registration endpoints.
-6. **Single-node design.** No queue, no horizontal session store; JWTs are
-   stateless (no revocation beyond expiry — 5-day default).
+5. **Rate limiting is in-memory and login-only** (A-26, fixed 2026-09-14).
+   `POST /api/v1/auth/login` is limited per IP + username (5 / 300 s,
+   settings-driven), but the counters are per worker and reset on restart, so
+   multi-worker deployments get N× the nominal limit and a restart clears all
+   state. Registration is not rate-limited; there is no account lockout. A
+   shared store (Redis) is the upgrade path.
+6. **Single-node design.** No queue, no horizontal session store. JWT
+   revocation exists since 2026-09-14 (A-27: `jti` denylist + logout) but the
+   denylist is per worker and cleared on restart — pre-restart revocations
+   lapse until the token's own expiry. Cross-worker revocation needs a shared
+   store.
 7. **Coverage tooling gap** (A-21) as above — reported numbers for the three
    biggest modules are lower bounds.
 8. **Windows dev caveat.** aiosqlite's thread-based driver triggers the

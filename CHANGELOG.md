@@ -4,6 +4,26 @@ All notable changes to Samarth AI are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is
 [SemVer](https://semver.org/)-flavoured. Local-only repo: the owner pushes.
 
+## [0.6.0] - 2026-09-14
+
+Infra-hardening pass (docs/AUDIT.md A-26, A-27): login brute-force
+protection and a JWT revocation story.
+
+### Added
+
+- **Login rate limiting**: `POST /api/v1/auth/login` is limited per client IP
+  + submitted username with an in-memory sliding window (5 attempts / 300 s by
+  default, `LOGIN_RATE_LIMIT_ATTEMPTS` / `LOGIN_RATE_LIMIT_WINDOW_SECONDS`).
+  Exceeding it returns **429 Too Many Requests** with a `Retry-After` header.
+  Single-process by design: limits are per worker under multi-worker
+  deployments and reset on restart (A-26).
+- **JWT revocation**: access tokens carry a `jti` claim; a new
+  `POST /api/v1/auth/logout` endpoint (and the UI logout) revokes the
+  presented token for the rest of its lifetime via an in-memory denylist with
+  expiry parity. Revoked tokens fail authentication on both the API and the
+  UI. Restart clears the denylist, so pre-restart revocations lapse until the
+  token's own expiry (A-27).
+
 ## [0.5.0] - 2026-09-14
 
 Audit-remediation pass (docs/AUDIT.md A-08..A-18, A-25). Breaking API
