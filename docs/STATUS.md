@@ -22,11 +22,15 @@ authorization; gates re-run green immediately before push.
   the dependency is no longer in the graph at all (absent from `uv.lock` and
   `pyproject.toml`).
 - No bumps applied: every locked version is already current; nothing to fix.
-- Observation (no change): the `pypdf>=6.1.0` constraint floor in
-  `pyproject.toml` is below several patched minors; the committed lock
-  (6.18.0) is authoritative and `uv lock`/`uv sync` preserve it, so there is
-  no realistic path to a vulnerable resolution. Recorded for the next
-  constraint-tidying pass.
+- Follow-up (2026-09-16, second pass): the `pypdf>=6.1.0` constraint floor
+  from the observation below has been raised to `pypdf>=6.18.0` in
+  `pyproject.toml` (lock `requires-dist` updated; locked version still
+  6.18.0, `uv lock --check` clean, gates re-run green). A fresh resolve can
+  no longer pick a vulnerable pypdf.
+- Observation (superseded by the follow-up above): the `pypdf>=6.1.0`
+  constraint floor in `pyproject.toml` was below several patched minors; the
+  committed lock (6.18.0) was authoritative and `uv lock`/`uv sync` preserved
+  it, so there was no realistic path to a vulnerable resolution.
 - Gates at this commit: 206/206 tests pass (2 pre-existing short-HMAC-key
   fixture warnings, `InsecureKeyLengthWarning` in `tests/test_security.py`),
   ruff clean.

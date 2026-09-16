@@ -13,11 +13,14 @@ All notable changes to Samarth AI are documented here. Format follows
   after the v0.6.0 `uv.lock` refresh auto-resolved all of them, and each
   locked version was manually verified at or above the advisories'
   `first_patched_version`. No dependency bumps required.
+- Follow-up: `pypdf` floor raised from `>=6.1.0` to `>=6.18.0` in
+  `pyproject.toml` (locked version unchanged at 6.18.0), so a fresh resolve
+  can no longer pick a vulnerable pypdf.
 
 ### Docs
 
 - STATUS.md / AUDIT.md record the triage evidence (locked-version table,
-  `ecdsa` graph-removal note, `pypdf>=6.1.0` floor observation).
+  `ecdsa` graph-removal note, pypdf floor tightening).
 
 ## [0.6.0] - 2026-09-14
 
