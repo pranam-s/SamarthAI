@@ -4,6 +4,21 @@ All notable changes to Samarth AI are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is
 [SemVer](https://semver.org/)-flavoured.
 
+## [Unreleased]
+
+### Security
+
+- Dependabot alert triage (docs/AUDIT.md A-29): 66 alerts on record, **0
+  open** — the earlier "64 open" snapshot was stale; Dependabot's re-scan
+  after the v0.6.0 `uv.lock` refresh auto-resolved all of them, and each
+  locked version was manually verified at or above the advisories'
+  `first_patched_version`. No dependency bumps required.
+
+### Docs
+
+- STATUS.md / AUDIT.md record the triage evidence (locked-version table,
+  `ecdsa` graph-removal note, `pypdf>=6.1.0` floor observation).
+
 ## [0.6.0] - 2026-09-14
 
 Infra-hardening pass (docs/AUDIT.md A-26, A-27): login brute-force

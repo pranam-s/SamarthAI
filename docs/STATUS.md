@@ -1,8 +1,35 @@
 # Status — honest state
 
-Updated: 2026-09-16 (IST): v0.6.0 state (login rate limiting + JWT revocation
-on top of the v0.5.0 audit-remediation pass) pushed to `origin/main` with
-owner authorization; gates re-run green immediately before push.
+Updated: 2026-09-16 (IST): Dependabot alert triage complete — 0 open alerts
+remain (A-29); all 66 historical alerts are in `fixed` state, verified against
+`uv.lock`. v0.6.0 state (login rate limiting + JWT revocation on top of the
+v0.5.0 audit-remediation pass) pushed to `origin/main` with owner
+authorization; gates re-run green immediately before push.
+
+## Dependabot triage (2026-09-16, A-29)
+
+- GitHub reported 66 Dependabot alerts for this repo; **0 are open** — all are
+  in `fixed` state. The "64 open" figure from the triage brief was a stale
+  snapshot: Dependabot's re-scan after the Sep-2026 `uv.lock` refresh
+  (`3055cb2`, v0.6.0) auto-resolved every alert whose locked version already
+  met `first_patched_version`.
+- Verified each locked version against the alerts' `first_patched_version`:
+  cryptography 50.0.1 (≥ 50.0.0), starlette 1.6.0 (≥ 1.3.1), pypdf 6.18.0
+  (≥ 6.16.1), python-multipart 0.0.32 (≥ 0.0.31), pyjwt 2.13.0 (= 2.13.0),
+  urllib3 2.7.0 (= 2.7.0), plus pyasn1/idna/lxml/requests/pydantic-settings/
+  python-dotenv/pygments/pytest — all at or above the patched floor.
+- `ecdsa` alerts (GHSA-wj6h-64fc-37mp) closed with no patched release because
+  the dependency is no longer in the graph at all (absent from `uv.lock` and
+  `pyproject.toml`).
+- No bumps applied: every locked version is already current; nothing to fix.
+- Observation (no change): the `pypdf>=6.1.0` constraint floor in
+  `pyproject.toml` is below several patched minors; the committed lock
+  (6.18.0) is authoritative and `uv lock`/`uv sync` preserve it, so there is
+  no realistic path to a vulnerable resolution. Recorded for the next
+  constraint-tidying pass.
+- Gates at this commit: 206/206 tests pass (2 pre-existing short-HMAC-key
+  fixture warnings, `InsecureKeyLengthWarning` in `tests/test_security.py`),
+  ruff clean.
 
 ## What works right now (verified this session)
 
