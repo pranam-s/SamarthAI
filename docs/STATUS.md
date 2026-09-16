@@ -1,7 +1,8 @@
 # Status — honest state
 
-Updated: 2026-09-14 (IST), infra-hardening pass (login rate limiting + JWT
-revocation) on top of `3055cb2` (v0.5.0 audit-remediation state).
+Updated: 2026-09-16 (IST): v0.6.0 state (login rate limiting + JWT revocation
+on top of the v0.5.0 audit-remediation pass) pushed to `origin/main` with
+owner authorization; gates re-run green immediately before push.
 
 ## What works right now (verified this session)
 
@@ -22,7 +23,7 @@ revocation) on top of `3055cb2` (v0.5.0 audit-remediation state).
 - Everything from the v0.5.0 audit-remediation pass below still holds (180 of
   the 206 tests are that pass's suite).
 
-## Changes in this pass (2 feature commits + this docs commit, local only — NOT pushed per owner directive)
+## Changes in this pass (2 feature commits + docs commits; pushed to origin/main 2026-09-16 with owner authorization)
 
 1. `9abb453` `feat(api)`: A-26 — login rate limiting per IP+username,
    in-memory sliding window (`core/ratelimit.py`), 429 + `Retry-After`;
@@ -85,7 +86,7 @@ All gates were run and green immediately before this file was committed
 
 ---
 
-## Previous pass (v0.5.0 audit remediation, 11 commits, local only — NOT pushed)
+## Previous pass (v0.5.0 audit remediation, 11 commits)
 
 Audit remediation per docs/AUDIT.md; commit hashes are the evidence anchors:
 

@@ -8,24 +8,25 @@ Production-oriented FastAPI platform for resume management, AI-assisted job matc
 
 ## Highlights
 
-- **FastAPI + Jinja SSR** — REST API + server-rendered UI, unified codebase.
+- **FastAPI + Jinja SSR**: REST API + server-rendered UI, unified codebase.
 - **AI provider routing** with graceful degradation:
   - Primary: Google GenAI (Gemini 2.5 Flash with thinking budget)
   - Fallback: OpenRouter (OpenAI-compatible)
   - Heuristic fallbacks when both providers are unavailable
-- **Externalized AI prompts** in Markdown files (`prompts/`) — edit without touching Python.
+- **Externalized AI prompts** in Markdown files (`prompts/`), so you can edit them without touching Python.
 - **Secure authentication**:
   - bcrypt password hashing (direct, no passlib)
-  - Signed JWT access tokens with configurable expiry
+  - Signed JWT access tokens with configurable expiry, revocable via logout
   - CSRF protection on all authenticated write forms
   - HTTP-only secure cookies with configurable `SameSite`
   - 8-character minimum password; standard error semantics (401 unauthenticated
     with `WWW-Authenticate: Bearer`, 403 forbidden, 409 duplicate registration)
-- **Skills Gap Analysis** — compare resume skills to job requirements, get a gap score and learning path.
-- **Job management** — post, edit, and delete jobs (recruiters); browse and apply (job seekers).
-- **Localization** — 20 locales (10 Indian + 10 global), fully translated including new features.
-- **Modern Python tooling** — `uv`, `ruff`, `ty`, `pytest`, GitHub Actions CI.
-- **Docker ready** — compose with named volumes, health check, and resource limits.
+  - Login rate limiting per IP + username (429 + `Retry-After`)
+- **Skills Gap Analysis**: compare resume skills to job requirements, get a gap score and learning path.
+- **Job management**: post, edit, and delete jobs (recruiters); browse and apply (job seekers).
+- **Localization**: 20 locales (10 Indian + 10 global), every UI string translated.
+- **Modern Python tooling**: `uv`, `ruff`, `ty`, `pytest`, GitHub Actions CI.
+- **Docker ready**: compose with named volumes, health check, and resource limits.
 
 ## Tech Stack
 
@@ -35,7 +36,7 @@ Production-oriented FastAPI platform for resume management, AI-assisted job matc
 | Web Framework | FastAPI + Jinja2 SSR |
 | ORM | SQLAlchemy 2.0 (async) |
 | Database | SQLite (default) / PostgreSQL (asyncpg) |
-| AI Primary | Google GenAI SDK — Gemini 2.5 Flash |
+| AI Primary | Google GenAI SDK (Gemini 2.5 Flash) |
 | AI Fallback | OpenAI SDK → OpenRouter |
 | Auth | bcrypt + PyJWT + itsdangerous CSRF |
 | Frontend | DaisyUI 3 + Tailwind CSS CDN + Alpine.js + Chart.js |
@@ -135,11 +136,11 @@ All API endpoints are prefixed with `/api/v1/`.
 uv run ruff format --check .   # formatting
 uv run ruff check .            # linting
 uv run ty check .              # type checking (blocking in CI)
-uv run pytest tests/ -v        # 180 tests
+uv run pytest tests/ -v        # 206 tests
 ```
 
 CI enforces a coverage gate of ≥95% on the fully-measurable core modules
-(`core/`, `db/`, `models.py`, `schemas.py` — currently 100%). See
+(`core/`, `db/`, `models.py`, `schemas.py`, currently at 100%). See
 `docs/EVALUATION.md` for why `api.py`/`services.py`/`ui.py` are reported but
 not gated (coverage.py undercounts code resumed after async DB awaits).
 
@@ -163,13 +164,15 @@ The compose file includes a health check, named volumes for uploads and the data
 ├── core/
 │   ├── config.py        Settings & environment config
 │   ├── security.py      bcrypt / JWT / CSRF helpers
+│   ├── ratelimit.py     Login rate limiter (sliding window, injectable clock)
+│   ├── revocation.py    JWT jti denylist with expiry parity
 │   └── i18n.py          Locale normalization + 20-locale translations
 ├── db/
 │   └── database.py      Async engine & session factory
 ├── prompts/             Externalized AI prompt templates (.md)
 ├── templates/           Jinja2 SSR templates
 ├── static/              Static assets
-├── tests/               180 tests (services, security, i18n, config, database, API, UI)
+├── tests/               206 tests (services, security, i18n, config, database, ratelimit, revocation, API, UI)
 ├── docs/                Audit, PRD, architecture, evaluation, style guides
 ├── .env.example         Example environment configuration
 ├── .github/workflows/   CI/CD pipeline (quality + test + docker)
@@ -186,7 +189,7 @@ Locale is switched from the sidebar language selector (persisted in a cookie).
 | Indian / Regional | `en`, `hi`, `bn`, `te`, `mr`, `ta`, `ur`, `gu`, `kn`, `ml` |
 | Global | `es`, `fr`, `ar`, `zh`, `pt`, `de`, `ru`, `ja`, `ko`, `it` |
 
-All UI strings — including Skills Gap Analysis and Job Edit/Delete — are fully translated across all 20 locales. English is the base; other locales inherit any untranslated keys automatically.
+All UI strings, including Skills Gap Analysis and Job Edit/Delete, are translated across all 20 locales. English is the base; other locales inherit any untranslated keys automatically.
 
 ## Environment Variables
 
@@ -194,7 +197,7 @@ See `.env.example` for the full list. Key variables:
 
 | Variable | Default | Description |
 |---|---|---|
-| `SECRET_KEY` | (random) | JWT signing key — **set in production** |
+| `SECRET_KEY` | (random) | JWT signing key; **set in production** |
 | `GOOGLE_API_KEY` | — | Google GenAI API key |
 | `OPENROUTER_API_KEY` | — | OpenRouter API key (fallback) |
 | `DATABASE_URL` | SQLite | Async SQLAlchemy URL |
@@ -203,11 +206,11 @@ See `.env.example` for the full list. Key variables:
 | `LOGIN_RATE_LIMIT_WINDOW_SECONDS` | `300` | Sliding window for the login limiter (in-memory: per worker, reset on restart) |
 | `CORS_ORIGINS` | localhost | Comma-separated allowed origins |
 | `DEFAULT_LOCALE` | `en` | Default UI locale |
-| `AI_THINKING_BUDGET` | `8192` | Gemini thinking token budget |
+| `GOOGLE_THINKING_BUDGET` | `8192` | Gemini thinking token budget |
 
 ## Notes
 
 - When AI provider keys are unavailable, heuristic fallbacks keep all core flows operational.
 - SQLite is the default for fast local setup; switch to PostgreSQL via `DATABASE_URL=postgresql+asyncpg://...`.
-- AI prompts live in `prompts/*.md` — edit them without touching Python code.
+- AI prompts live in `prompts/*.md`; edit them without touching Python code.
 - All form writes are CSRF-protected; the API uses Bearer token auth separately.

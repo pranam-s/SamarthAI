@@ -2,7 +2,7 @@
 
 All notable changes to Samarth AI are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is
-[SemVer](https://semver.org/)-flavoured. Local-only repo: the owner pushes.
+[SemVer](https://semver.org/)-flavoured.
 
 ## [0.6.0] - 2026-09-14
 

@@ -31,13 +31,17 @@ Browser ──► main.py (FastAPI app)
 | `models.py` | 4 ORM tables: users, resumes, jobs, applications | Pydantic |
 | `core/config.py` | `Settings` (pydantic-settings), `.env` loading | — |
 | `core/security.py` | bcrypt hashing, PyJWT HS256 tokens, itsdangerous CSRF | HTTP |
+| `core/ratelimit.py` | Login rate limiter: sliding window per IP + username, injectable clock, periodic sweep | Policy for any other endpoint |
+| `core/revocation.py` | JWT `jti` denylist with expiry parity (entries dropped at the token's own `exp`) | Persistence (in-memory by design) |
 | `core/i18n.py` | 20-locale translations, `normalize_locale`, `translate` (EN fallback) | — |
 | `prompts/*.md` | Externalized AI prompts (`{placeholder}` substitution) | Code |
 
 ## Request flows
 
 **Auth.** API: `OAuth2PasswordBearer` header → `get_current_user` decodes JWT
-(`sub` string → int), loads user, rejects inactive. UI: `httponly` cookie →
+(`sub` string → int; `jti` checked against the revocation denylist), loads
+user, rejects inactive. Login is rate-limited per client IP + submitted
+username; logout revokes the presented token. UI: `httponly` cookie →
 `get_optional_user` (anonymous-tolerant) or `get_current_user` (strict); every
 authenticated form POST first validates a per-user timed CSRF token (2 h).
 
@@ -56,7 +60,7 @@ provider is available.
 
 ## AI provider strategy
 
-`AIService._call_text` tries `AI_PRIMARY_PROVIDER` then `AI_FALLBACK_PROVIDER`;
+`AIService.call_text` tries `AI_PRIMARY_PROVIDER` then `AI_FALLBACK_PROVIDER`;
 both degrade to `None` when unconfigured; callers fall back to deterministic
 heuristics. Google calls are async-native; OpenRouter (OpenAI SDK) runs in
 `asyncio.to_thread`. `parse_json` extracts the first balanced JSON object from

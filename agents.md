@@ -10,7 +10,7 @@ with OpenRouter fallback and heuristic fallbacks when no keys. Python 3.12, uv e
 ## Architecture boundaries
 
 - `api.py` (REST `/api/v1`) and `ui.py` (SSR) → `services.py` (domain + AI) → `models.py` (ORM) → `db/database.py`.
-- `schemas.py` = all Pydantic I/O contracts; `core/` = config, security, i18n; `prompts/*.md` = AI prompt templates (edit there, not in Python).
+- `schemas.py` = all Pydantic I/O contracts; `core/` = config, security, ratelimit, revocation, i18n; `prompts/*.md` = AI prompt templates (edit there, not in Python).
 - Route modules: auth, permission checks, validation, response shaping only — no SQL, no AI calls.
 - Style guides: `docs/style-guides/python.md`, `docs/style-guides/fastapi.md`, `docs/style-guides/testing.md` — binding summaries of PEP 8 / FastAPI / pytest conventions.
 
@@ -45,7 +45,7 @@ with OpenRouter fallback and heuristic fallbacks when no keys. Python 3.12, uv e
 
 ## AI integrations
 
-- Google GenAI primary (Gemini 2.5 Flash, `AI_THINKING_BUDGET`), OpenRouter fallback, heuristic fallbacks so core flows work keyless.
+- Google GenAI primary (Gemini 2.5 Flash, `GOOGLE_THINKING_BUDGET`), OpenRouter fallback, heuristic fallbacks so core flows work keyless.
 - `AIService.parse_json()` extracts JSON from LLM output; prompts externalized in `prompts/*.md`.
 
 ## Docker
