@@ -1,6 +1,18 @@
 # Status — honest state
 
-Updated: 2026-09-16 (IST): Dependabot alert triage complete — 0 open alerts
+Updated: 2026-09-18 (IST): production-completion pass in progress. The last
+recorded residual (A-28, Alembic) is being executed per the six-step plan
+below; decisions in docs/adr/0001. Baseline at pass start (as-found,
+Windows/Py 3.12.14, `uv sync --all-groups` fresh): ruff format 46 files
+clean, ruff check 0 diagnostics, ty 0 diagnostics, pytest **206 passed,
+2 warnings** (the two pre-existing `InsecureKeyLengthWarning` fixture
+warnings in `tests/test_security.py`), gated coverage 100% (core 199 stmts,
+db 12, models 77, schemas 181), full matrix TOTAL 67% with the known A-21
+async undercount (api 53%, services 62%, ui 42%, main 75%). This section is
+re-measured and finalized at the end of the pass; intermediate states are
+not recorded here.
+
+## Previous state (2026-09-16): Dependabot alert triage complete — 0 open alerts
 remain (A-29); all 66 historical alerts are in `fixed` state, verified against
 `uv.lock`. v0.6.0 state (login rate limiting + JWT revocation on top of the
 v0.5.0 audit-remediation pass) pushed to `origin/main` with owner
