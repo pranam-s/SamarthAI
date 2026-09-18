@@ -35,7 +35,7 @@ Two constraints shaped the decision:
    schema and makes `git clone && uv run uvicorn main:app` work with no
    extra step; dropping it would trade a real convenience for purity. Any
    change to existing columns/tables/constraints lands as an Alembic
-   revision — `create_all` cannot produce those, and the revision chain is
+   revision: `create_all` cannot produce those, and the revision chain is
    the only path a deployed database follows. This split is documented in
    docs/design.md §6 and ARCHITECTURE.md.
 4. **CI gains an `alembic upgrade head` smoke step** (fresh SQLite file →
@@ -55,7 +55,7 @@ Two constraints shaped the decision:
   The explicit command (or release step) is auditable. Revisit if a
   single-binary deploy story emerges.
 - **Raw SQL migration folder without Alembic.** Rejected: loses
-  autogenerate-from-models, downgrade paths, and revision lineage — the
+  autogenerate-from-models, downgrade paths, and revision lineage, the
   exact conveniences that keep the chain honest.
 
 ## Consequences

@@ -1,4 +1,4 @@
-# PRD — Samarth AI Resume Platform
+# PRD: Samarth AI Resume Platform
 
 Version 0.4 · 2026-09-09
 
@@ -38,6 +38,6 @@ details, and see market-wide skill demand.
 ## Non-functional requirements
 
 - No AI keys required for core flows (graceful degradation is a hard requirement).
-- Screen-reader and keyboard-first UI (owner is an NVDA user).
+- Screen-reader and keyboard-first UI is a hard requirement.
 - All uploads size-capped and type-restricted; secrets only via environment.
 - SQLite default for zero-config local runs; PostgreSQL via `DATABASE_URL`.

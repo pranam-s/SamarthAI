@@ -11,8 +11,8 @@ with OpenRouter fallback and heuristic fallbacks when no keys. Python 3.12, uv e
 
 - `api.py` (REST `/api/v1`) and `ui.py` (SSR) → `services.py` (domain + AI) → `models.py` (ORM) → `db/database.py`.
 - `schemas.py` = all Pydantic I/O contracts; `core/` = config, security, ratelimit, revocation, i18n; `prompts/*.md` = AI prompt templates (edit there, not in Python).
-- Route modules: auth, permission checks, validation, response shaping only — no SQL, no AI calls.
-- Style guides: `docs/style-guides/python.md`, `docs/style-guides/fastapi.md`, `docs/style-guides/testing.md` — binding summaries of PEP 8 / FastAPI / pytest conventions.
+- Route modules: auth, permission checks, validation, response shaping only; no SQL, no AI calls.
+- Style guides: `docs/style-guides/python.md`, `docs/style-guides/fastapi.md`, `docs/style-guides/testing.md`, binding summaries of PEP 8 / FastAPI / pytest conventions.
 
 ## Standards
 
@@ -27,7 +27,7 @@ with OpenRouter fallback and heuristic fallbacks when no keys. Python 3.12, uv e
 
 - pytest + pytest-asyncio (auto mode) + httpx ASGITransport; in-memory SQLite per test.
 - Test behavior and both sides of permission checks; exercise heuristic fallbacks by disabling provider clients, never by monkeypatching privates.
-- CI gates ≥95% coverage on `core/`, `db/`, `models.py`, `schemas.py` (measured 100%); `api/services/ui` reported only — coverage.py undercounts post-await code (docs/EVALUATION.md).
+- CI gates ≥95% coverage on `core/`, `db/`, `models.py`, `schemas.py` (measured 100%); `api/services/ui` reported only, because coverage.py undercounts post-await code (docs/EVALUATION.md).
 
 ## Security rules
 

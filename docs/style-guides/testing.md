@@ -14,9 +14,9 @@ httpx `AsyncClient` + `ASGITransport`.
 
 - All tests async; no `@pytest.mark.asyncio` needed (auto mode).
 - Fixtures in `tests/conftest.py`:
-  - `client` — httpx AsyncClient with `get_db` overridden to a fresh in-memory
+  - `client`: httpx AsyncClient with `get_db` overridden to a fresh in-memory
     SQLite session per test (create_all/drop_all around each test).
-  - `sample_resume_text`, `sample_parsed_resume`, `sample_parsed_job` — shared payloads.
+  - `sample_resume_text`, `sample_parsed_resume`, `sample_parsed_job`: shared payloads.
 - API helper: `_register_and_login(client, ...)` returns Bearer headers.
 - UI helper: `_register_and_login_ui(client, ...)` sets the auth cookie through
   the real form endpoints; `_get_csrf_token(client, path)` scrapes the hidden input.
@@ -27,7 +27,7 @@ httpx `AsyncClient` + `ASGITransport`.
 ## What to test
 
 - Behavior, not implementation: assert on HTTP status + response body, or on
-  returned domain objects — never on mocks of internals.
+  returned domain objects, never on mocks of internals.
 - Both sides of every permission check (owner vs non-owner, recruiter vs seeker).
 - Fallback paths: disable both AI provider clients
   (`service.google_client = None; service.openrouter_client = None`) and assert

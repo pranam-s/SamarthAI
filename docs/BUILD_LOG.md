@@ -4,7 +4,7 @@ The engineering history of the project: what was built, what was tested,
 what was rejected, and why the chosen approach won. Newest last. Point-in-time
 findings live in AUDIT.md; the current measured state lives in STATUS.md.
 
-## Phase 1 — initial build (2026-09-08 and before)
+## Phase 1: initial build (2026-09-08 and before)
 
 The first version shipped the whole product surface: FastAPI app with a REST
 API and a Jinja2 SSR UI over one service layer, SQLAlchemy 2.0 async against
@@ -18,7 +18,7 @@ tests. Two decisions from this phase still shape everything:
 - **`create_all` at startup** for schema setup. Convenient, and it became
   A-28 much later.
 
-## Phase 2 — full audit (2026-09-08/09)
+## Phase 2: full audit (2026-09-08/09)
 
 A line-by-line audit at commit `ec017a9` produced findings A-01..A-24
 (docs/AUDIT.md). The serious ones: unbounded upload size (A-01), no upload
@@ -27,7 +27,7 @@ handed to the DB without int parsing, which would break on PostgreSQL
 (A-04), and exception text rendered into HTML (A-05). Also recorded: `ty`
 type check ran with `continue-on-error` in CI, making it advisory (A-07).
 
-## Phase 3 — audit remediation, v0.5.0 (2026-09-14, 11 commits)
+## Phase 3: audit remediation, v0.5.0 (2026-09-14, 11 commits)
 
 All Medium/Low findings fixed at the root, one commit per finding with
 regression tests. Choices worth remembering:
@@ -57,13 +57,13 @@ regression tests. Choices worth remembering:
   services.py / ui.py looked impossibly low. Root-caused with a 14-line
   Starlette repro: code resumed after an await on the aiosqlite worker
   thread is not recorded by coverage.py, on 3.12 and 3.13, under sysmon and
-  ctrace, and unfixed in coverage 7.13.4 → 7.16.0. Rather than distrust all
-  numbers, the CI gate is scoped to the fully-measurable modules (core/, db/,
+  ctrace, and unfixed in coverage 7.13.4 → 7.16.0. The CI gate is therefore
+  scoped to the fully-measurable modules (core/, db/,
   models, schemas; 100%) and the rest are reported as deterministic lower
   bounds. Rejected: deleting the coverage gate, or silently shipping
   misleading percentages.
 
-## Phase 4 — infra hardening, v0.6.0 (2026-09-14)
+## Phase 4: infra hardening, v0.6.0 (2026-09-14)
 
 Two infrastructure gaps became features:
 
@@ -79,7 +79,7 @@ Two infrastructure gaps became features:
   Same honest limits: per worker, cleared on restart, and legacy tokens
   without a `jti` validate but cannot be revoked.
 
-## Phase 5 — dependency and supply-chain pass (2026-09-16)
+## Phase 5: dependency and supply-chain pass (2026-09-16)
 
 The whole dependency set was upgraded to September-2026 stable via
 `uv lock --upgrade` (v0.6.0 lock refresh). GitHub's Dependabot later showed
@@ -91,7 +91,7 @@ the `pypdf>=6.1.0` floor predated several patched minors, so it was raised to
 already current. Lesson: a lockfile is a snapshot; the constraint floor is
 what a fresh clone resolves against.
 
-## Phase 6 — migrations and production completion (2026-09-18)
+## Phase 6: migrations and production completion (2026-09-18)
 
 The last recorded residual (A-28) got its six-step plan executed:
 

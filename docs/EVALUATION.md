@@ -9,7 +9,7 @@ uv run ruff format --check . && uv run ruff check . && uv run ty check
 uv run pytest tests/ --cov=. --cov-report=term-missing
 ```
 
-## Quality gates (measured, this revision — 2026-09-18, clean v0.7.0 tree)
+## Quality gates (measured this revision, 2026-09-18, clean v0.7.0 tree)
 
 | Gate | Result |
 |---|---|
@@ -28,7 +28,7 @@ only core+db (211 statements) because file-style `--cov=models.py`/
 7.16.x (A-25 follow-up). With module-name flags the true gated surface is
 469 statements, all covered.
 
-## Coverage, full matrix (pytest-cov 7.16.1, module-name flags; re-measured 2026-09-18 at v0.7.0 — identical statement counts and percentages to the v0.6.0 run)
+## Coverage, full matrix (pytest-cov 7.16.1, module-name flags; re-measured 2026-09-18 at v0.7.0, identical statement counts and percentages to the v0.6.0 run)
 
 | Module | Stmts | Miss | Measured | Trustworthy? |
 |---|---|---|---|---|
@@ -62,7 +62,7 @@ FastAPI+aiosqlite **without** SQLAlchemy. Verified NOT fixed by: Python
 
 Consequence: line percentages for `api.py`/`services.py`/`ui.py` are
 deterministic lower bounds, useful as a regression trend but not as an absolute
-measure — hence the CI gate is scoped to the fully-measurable modules
+measure, so the CI gate is scoped to the fully-measurable modules
 (documented in `docs/style-guides/testing.md`). Tests nonetheless exercise the
 undercounted paths behaviorally (REST endpoints, the permission matrix, UI
 auth/CSRF flows, upload hardening, login rate limiting, logout revocation).
@@ -72,8 +72,8 @@ auth/CSRF flows, upload hardening, login rate limiting, logout revocation).
 - Heuristic fallback paths are pure in-process computation; full test suite
   (206 tests) runs in ~31 s on 6 cores (measured 2026-09-16).
 - AI-enabled paths add one round-trip per LLM call (parse, score, feedback are
-  sequential by design); recommendations score up to 100 jobs **sequentially** —
-  this is the dominant latency risk with real keys (A-13).
+  sequential by design); recommendations score up to 100 jobs sequentially,
+  which is the dominant latency risk with real keys (A-13).
 - SQLite via aiosqlite is single-writer; adequate for single-node self-hosting,
   not for concurrent write-heavy use (switch to PostgreSQL).
 
@@ -96,10 +96,10 @@ auth/CSRF flows, upload hardening, login rate limiting, logout revocation).
    shared store (Redis) is the upgrade path.
 5. **Single-node design.** No queue, no horizontal session store. JWT
    revocation exists since 2026-09-14 (A-27: `jti` denylist + logout) but the
-   denylist is per worker and cleared on restart — pre-restart revocations
+   denylist is per worker and cleared on restart; pre-restart revocations
    lapse until the token's own expiry. Cross-worker revocation needs a shared
    store.
-6. **Coverage tooling gap** (A-21) as above — reported numbers for the three
+6. **Coverage tooling gap** (A-21) as above; reported numbers for the three
    biggest modules are lower bounds.
 7. **Windows dev caveat.** aiosqlite's thread-based driver triggers the
    coverage undercount everywhere (not Windows-specific), but local manual

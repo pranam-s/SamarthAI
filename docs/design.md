@@ -1,4 +1,4 @@
-# Design — Samarth AI
+# Design: Samarth AI
 
 High-level and low-level design for the platform. For a guided tour see the
 README; for the running record of what changed and why, see BUILD_LOG.md;
@@ -95,7 +95,7 @@ flowchart LR
 | `core/security.py` | bcrypt hashing, PyJWT HS256 encode/decode (`sub` str, `jti`), CSRF serializer, `decode_token_subject` shared by API and UI | HTTP concerns |
 | `core/ratelimit.py` | Login rate limiter: sliding window per IP + submitted username, injectable clock, periodic sweep | Policy for other endpoints |
 | `core/revocation.py` | JWT `jti` denylist with expiry parity (entries dropped at token `exp`) | Persistence (in-memory by design) |
-| `core/i18n.py` | 20-locale translations, `normalize_locale`, `translate` (EN fallback), locale list as single source of truth (A-11) | — |
+| `core/i18n.py` | 20-locale translations, `normalize_locale`, `translate` (EN fallback), locale list as single source of truth (A-11) | none |
 | `db/database.py` | Async engine + session factory from `settings.DATABASE_URL` | Model definitions |
 | `migrations/` | Alembic migration scripts; `env.py` wired to `models.Base.metadata` + settings URL | Ad-hoc schema edits outside revisions |
 | `prompts/*.md` | Externalized AI prompt templates with `{placeholder}` slots | Python code |
@@ -105,14 +105,14 @@ flowchart LR
 Four tables, SQLAlchemy 2.0 typed mappings (see `models.py` for the full
 column list):
 
-- **users** — email (unique), `hashed_password` (bcrypt), profile fields,
+- **users**: email (unique), `hashed_password` (bcrypt), profile fields,
   `is_recruiter`, `is_active`, timestamps.
-- **resumes** — FK `users.id`; `full_text` plus JSON columns for parsed
+- **resumes**: FK `users.id`; `full_text` plus JSON columns for parsed
   sections (skills, experience, education, projects, certifications,
   achievements); `file_path`/`file_type` for uploads; timestamps.
-- **jobs** — FK `users.id` (recruiter); title, description, requirements;
+- **jobs**: FK `users.id` (recruiter); title, description, requirements;
   `required_skills` JSON; location, salary; timestamps.
-- **applications** — FK `resumes.id` + `jobs.id`; status
+- **applications**: FK `resumes.id` + `jobs.id`; status
   (new → reviewed → shortlisted → rejected); `match_score` JSON detail;
   timestamps.
 
@@ -124,7 +124,7 @@ built with two batch queries (A-15), not ad-hoc ORM attributes.
 
 - **Passwords.** bcrypt direct (no passlib), per-user salt, 72-byte input
   truncation handled per bcrypt 4+/5 semantics. Minimum length 8 enforced in
-  `schemas.UserCreate` (API 422) and the UI register form (400) —
+  `schemas.UserCreate` (API 422) and the UI register form (400);
   `MIN_PASSWORD_LENGTH` lives in schemas.py to keep that module import-light
   (A-25).
 - **Tokens.** PyJWT HS256; `sub` is the stringified user id (parsed to int
@@ -133,7 +133,7 @@ built with two batch queries (A-15), not ad-hoc ORM attributes.
 - **Revocation.** `core/revocation.py` holds an in-memory `jti` denylist.
   Entries are dropped at the token's own `exp` (expiry parity). Logout (API
   + UI) revokes the presented token. The denylist is per worker and resets
-  on restart — documented limitation with the Redis upgrade path recorded.
+  on restart, a documented limitation with the Redis upgrade path recorded.
 - **Cookies vs Bearer.** The UI uses httponly cookies with
   `COOKIE_SECURE`/`COOKIE_SAMESITE` from settings and a per-user timed CSRF
   token (itsdangerous, 2 h max age) validated on every authenticated form
@@ -153,7 +153,7 @@ built with two batch queries (A-15), not ad-hoc ORM attributes.
 `AIService.call_text()` tries providers in order and returns the first
 success; `parse_json()` extracts JSON from LLM prose with a bracket-tracking
 scanner (handles fenced blocks and leading text). Prompts are Markdown files
-in `prompts/` with `{placeholder}` substitution — prompt edits never touch
+in `prompts/` with `{placeholder}` substitution; prompt edits never touch
 Python. Provider selection, key handling, and the heuristic fallbacks are
 exercised in tests by disabling provider clients, never by monkeypatching
 private members (see docs/style-guides/testing.md).
@@ -169,8 +169,8 @@ private members (see docs/style-guides/testing.md).
   not the migration path; schema changes land as Alembic revisions.
 - **Engines.** SQLite via aiosqlite (default, single-writer) or PostgreSQL
   via asyncpg; the URL comes from `settings.DATABASE_URL` and is passed to
-  Alembic through `env.py` reading the same settings object — no secrets in
-  the migration scripts.
+  Alembic through `env.py` reading the same settings object, so no secrets
+  in the migration scripts.
 
 ## 7. Key decisions (index)
 

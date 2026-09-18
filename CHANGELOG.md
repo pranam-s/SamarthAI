@@ -9,7 +9,7 @@ All notable changes to Samarth AI are documented here. Format follows
 ### Security
 
 - Dependabot alert triage (docs/AUDIT.md A-29): 66 alerts on record, **0
-  open** — the earlier "64 open" snapshot was stale; Dependabot's re-scan
+  open**; the earlier "64 open" snapshot was stale. Dependabot's re-scan
   after the v0.6.0 `uv.lock` refresh auto-resolved all of them, and each
   locked version was manually verified at or above the advisories'
   `first_patched_version`. No dependency bumps required.
@@ -24,8 +24,8 @@ All notable changes to Samarth AI are documented here. Format follows
 
 ## [0.7.0] - 2026-09-18
 
-Production-completion pass: the last recorded audit residual (A-28, database
-migrations), a dependency refresh, dead-code tooling, and documentation
+Closes the last recorded audit residual (A-28, database
+migrations); also a dependency refresh, dead-code tooling, and documentation
 rebuilt around executed commands.
 
 ### Added
@@ -72,8 +72,8 @@ rebuilt around executed commands.
 
 ## [0.6.0] - 2026-09-14
 
-Infra-hardening pass (docs/AUDIT.md A-26, A-27): login brute-force
-protection and a JWT revocation story.
+Infrastructure hardening (docs/AUDIT.md A-26, A-27): login brute-force
+protection and JWT revocation.
 
 ### Added
 
@@ -92,7 +92,7 @@ protection and a JWT revocation story.
 
 ## [0.5.0] - 2026-09-14
 
-Audit-remediation pass (docs/AUDIT.md A-08..A-18, A-25). Breaking API
+Fixes from the codebase audit (docs/AUDIT.md A-08..A-18, A-25). Breaking API
 behaviour changes are listed first.
 
 ### Changed (breaking for API consumers)
@@ -125,7 +125,8 @@ behaviour changes are listed first.
 
 - Ten unused schemas (`UserUpdate`, `ResumeCreate`, `ResumeUpdate`,
   `ApplicationUpdate`, `SkillBase`, `ExperienceBase`, `EducationBase`,
-  `ProjectBase`, `CertificationBase`, `AchievementBase`) — dead code (A-12).
+  `ProjectBase`, `CertificationBase`, `AchievementBase`) removed as dead
+  code (A-12).
 
 ### Refactored
 

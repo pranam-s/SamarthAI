@@ -36,7 +36,7 @@ uv run alembic downgrade -1 && uv run alembic upgrade head
 ```
 
 `create_all` at startup is a dev convenience for fresh databases only; do not
-rely on it for changes to existing tables (see docs/ADR/0001).
+rely on it for changes to existing tables (see docs/adr/0001).
 
 ## Quality gates (all required before a commit)
 

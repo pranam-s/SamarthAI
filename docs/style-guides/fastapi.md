@@ -31,7 +31,7 @@ schemas.py (I/O contracts)
 ## Schemas (Pydantic v2)
 
 - `model_config = ConfigDict(from_attributes=True)` on response models read from ORM.
-- Response models set explicitly via `response_model=` — never return raw ORM
+- Response models set explicitly via `response_model=`; never return raw ORM
   objects without one.
 - Nullable ORM columns must have `= None` (or a default) in schemas.
 - Prefer `Literal[...]` unions over free `str` for enumerated values

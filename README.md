@@ -74,8 +74,8 @@ Configuration is optional; copy `.env.example` to `.env` to set
 `SECRET_KEY`, `GOOGLE_API_KEY`/`OPENROUTER_API_KEY`, `DATABASE_URL`
 (PostgreSQL via `postgresql+asyncpg://...`), cookie flags, or the login
 rate-limit window. With no keys, parsing and scoring come from the
-heuristics: directionally correct, coarser than the LLM paths, and the
-limitation is stated in docs/EVALUATION.md rather than hidden.
+heuristics: directionally correct, coarser than the LLM paths. docs/EVALUATION.md
+records that limitation.
 
 ## Verify
 
@@ -93,11 +93,11 @@ uv run alembic upgrade head    # migration chain against a fresh database
 
 CI (GitHub Actions) runs the same gates plus a coverage floor of 95% on
 `core/`, `db/`, `models.py`, and `schemas.py` (currently 469/469 statements,
-100%). Actions are disabled on the repository per the owner's zero-spend
-policy; the workflow is kept runnable and was validated by executing every
-job's commands locally. Why reported coverage for `api.py`/`services.py`/
-`ui.py` is a lower bound: docs/EVALUATION.md (coverage.py misses code
-resumed after aiosqlite awaits).
+100%). Actions are disabled on the repository to keep spend at zero; the
+workflow is kept runnable and was validated by executing every job's commands
+locally. For why reported coverage on `api.py`/`services.py`/`ui.py` is a
+lower bound, see docs/EVALUATION.md (coverage.py misses code resumed after
+aiosqlite awaits).
 
 ## API overview
 
