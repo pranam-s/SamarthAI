@@ -102,6 +102,5 @@ auth/CSRF flows, upload hardening, login rate limiting, logout revocation).
 6. **Coverage tooling gap** (A-21) as above; reported numbers for the three
    biggest modules are lower bounds.
 7. **Windows dev caveat.** aiosqlite's thread-based driver triggers the
-   coverage undercount everywhere (not Windows-specific), but local manual
-   testing here happens on Windows/VMware; CI (ubuntu) is the reference
-   environment for gates.
+   coverage undercount everywhere (not Windows-specific); CI (ubuntu) is the
+   reference environment for gates.
