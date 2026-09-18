@@ -54,14 +54,34 @@ jobs:
       # Coverage gate is scoped to fully-measurable modules. api.py/services.py/ui.py
       # undercount async code resumed after aiosqlite awaits (docs/AUDIT.md A-21,
       # docs/EVALUATION.md) so they are reported but not gated.
+      # Module-name flags are required: file-style flags (--cov=models.py) make
+      # coverage 7.16.x warn "module not imported" and silently drop the target
+      # from measurement (docs/AUDIT.md A-25).
       - name: Run tests with coverage gate on core modules
         run: >
           uv run pytest tests/ -v --tb=short
-          --cov=core --cov=db --cov=models.py --cov=schemas.py
+          --cov=core --cov=db --cov=models --cov=schemas
           --cov-report=term-missing --cov-fail-under=95
         env:
-          SECRET_KEY: "ci-test-secret-key-not-real"
+          SECRET_KEY: "ci-test-secret-key-not-real-padded-to-32-bytes-min"
           DATABASE_URL: "sqlite+aiosqlite:///./test.db"
+
+      # ADR-0001: the Alembic chain is the canonical schema path, so a broken
+      # revision chain must fail the build. Fresh database → upgrade head →
+      # every model table exists.
+      - name: Alembic migration smoke (fresh DB, upgrade head)
+        run: |
+          rm -f ci_migrations_smoke.db
+          uv run alembic upgrade head
+          uv run python -c "
+          import sqlite3
+          conn = sqlite3.connect('ci_migrations_smoke.db')
+          tables = {r[0] for r in conn.execute(\"SELECT name FROM sqlite_master WHERE type='table'\")}
+          conn.close()
+          missing = {'users', 'resumes', 'jobs', 'applications'} - tables
+          assert not missing, f'migration smoke: missing tables {missing}'
+          print('migration smoke: all 4 tables present')
+          "
 
   docker:
     name: Docker Build
@@ -77,7 +97,7 @@ jobs:
       - name: Verify container starts
         run: |
           docker run -d --name samarth-test \
-            -e SECRET_KEY="docker-test-key" \
+            -e SECRET_KEY="docker-test-key-not-a-production-secret-32b" \
             -e DATABASE_URL="sqlite+aiosqlite:///./app.db" \
             -p 8000:8000 \
             samarth-ai:${{ github.sha }}
