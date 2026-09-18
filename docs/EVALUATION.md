@@ -1,7 +1,7 @@
 # Evaluation & Limitations
 
-All numbers below were measured on 2026-09-16 (UTC+5:30) on the audit machine
-(Windows 11, Python 3.12.14) at the v0.6.0 state; first measured 2026-09-09
+All numbers below were measured on 2026-09-18 (UTC+5:30) on the audit machine
+(Windows 11, Python 3.12.14) at the v0.7.0 state; first measured 2026-09-09
 after the dependency upgrade to Sep-2026 stable. Reproduce with:
 
 ```bash
@@ -9,17 +9,26 @@ uv run ruff format --check . && uv run ruff check . && uv run ty check
 uv run pytest tests/ --cov=. --cov-report=term-missing
 ```
 
-## Quality gates (measured, this revision)
+## Quality gates (measured, this revision — 2026-09-18, clean v0.7.0 tree)
 
 | Gate | Result |
 |---|---|
-| `ruff format --check` | clean (41 files) |
+| `ruff format --check` | clean (47 files) |
 | `ruff check` | 0 diagnostics |
 | `ty check` | 0 diagnostics |
-| `pytest` | 206 passed in 30.6 s (was 124 at audit start, 153 at v0.4.0) |
-| Coverage gate (CI: core+db+models+schemas, ≥95%) | 100% (468/468 statements, incl. the v0.6.0 `core/ratelimit.py` + `core/revocation.py`) |
+| `deptry .` | no issues |
+| `vulture` (src modules, 80% confidence) | clean |
+| `pytest` | **206 passed, 0 warnings** in 101 s (was 124 at audit start, 153 at v0.4.0; the 2 `InsecureKeyLengthWarning`s present at v0.6.0 were fixed at source) |
+| Coverage gate (CI: core+db+models+schemas, ≥95%) | 100% (469/469 statements, incl. the v0.6.0 `core/ratelimit.py` + `core/revocation.py`) |
+| `alembic upgrade head` (fresh DB) | clean; downgrade base round-trips (ADR-0001) |
 
-## Coverage, full matrix (pytest-cov 7.1.0, module-name flags)
+Note: the CI gate previously reported "468/468" while actually measuring
+only core+db (211 statements) because file-style `--cov=models.py`/
+`--cov=schemas.py` flags silently drop those targets under coverage
+7.16.x (A-25 follow-up). With module-name flags the true gated surface is
+469 statements, all covered.
+
+## Coverage, full matrix (pytest-cov 7.16.1, module-name flags; re-measured 2026-09-18 at v0.7.0 — identical statement counts and percentages to the v0.6.0 run)
 
 | Module | Stmts | Miss | Measured | Trustworthy? |
 |---|---|---|---|---|
@@ -70,9 +79,9 @@ auth/CSRF flows, upload hardening, login rate limiting, logout revocation).
 
 ## Limitations
 
-1. **No DB migrations.** `create_all` only; column changes require manual
-   migration (A-28; deferred 2026-09-14 with exact adoption steps recorded in
-   docs/STATUS.md).
+1. **No DB migrations.** CLOSED 2026-09-18 (ADR-0001): Alembic is the
+   change path; `create_all` remains only as a fresh-database convenience.
+   Existing deployments upgrade with `uv run alembic upgrade head`.
 2. **Match scoring is LLM-dependent for nuance.** Heuristics are coarse
    (set intersection + fixed weights 0.6/0.3/0.1); scores without keys are
    directional, not calibrated.
