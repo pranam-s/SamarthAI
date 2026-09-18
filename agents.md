@@ -18,8 +18,9 @@ with OpenRouter fallback and heuristic fallbacks when no keys. Python 3.12, uv e
 
 - Minimal, root-cause fixes; no surface patches, hacks, or stubs-as-done.
 - Schema nullability mirrors ORM (`= None` on nullable columns).
+- Schema changes to existing tables land as Alembic revisions (`uv run alembic revision --autogenerate`, review the ops, verify upgrade + downgrade); `create_all` in the lifespan only covers fresh databases (docs/adr/0001).
 - Update routes + services + schemas + templates together; add i18n keys to EN + all 19 locale overrides.
-- Quality gates before every commit: `uv run ruff format --check . && uv run ruff check . && uv run ty check && uv run pytest tests/`.
+- Quality gates before every commit: `uv run ruff format --check . && uv run ruff check . && uv run ty check && uv run deptry . && uv run pytest tests/` (vulture runs on changed modules; config in pyproject).
 - Conventional commits (`feat:`, `fix:`, `test:`, `docs:`, `chore(deps):`, `ci:`); commit after each green step.
 
 ## Testing policy

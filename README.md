@@ -1,148 +1,148 @@
-# Samarth AI Resume Platform
+# Samarth AI
 
 [![CI](https://github.com/pranam-s/SamarthAI/actions/workflows/ci.yml/badge.svg)](https://github.com/pranam-s/SamarthAI/actions/workflows/ci.yml)
 
-Production-oriented FastAPI platform for resume management, AI-assisted job matching, skills gap analysis, and multilingual recruiter/jobseeker workflows.
+A resume and job-matching platform for job seekers and recruiters. Upload a
+resume, get it parsed into structured sections, match it against jobs with
+scores and feedback, and run a skills-gap analysis that returns a learning
+path. Recruiters post jobs, review applications with match details, and see
+market-level skill demand.
 
-**Maintainer:** pranam-s · [GitHub](https://github.com/pranam-s/SamarthAI)
+FastAPI serves a REST API and a server-rendered UI from one codebase. Every
+AI-dependent feature works without API keys: providers are tried in order
+(Google GenAI, then OpenRouter), and a deterministic heuristic takes over when
+neither is configured, so the app never blocks on an external service. The
+screenshots below were captured from a keyless run, so what you see is the
+heuristic mode real users get on a fresh clone.
 
-## Highlights
-
-- **FastAPI + Jinja SSR**: REST API + server-rendered UI, unified codebase.
-- **AI provider routing** with graceful degradation:
-  - Primary: Google GenAI (Gemini 2.5 Flash with thinking budget)
-  - Fallback: OpenRouter (OpenAI-compatible)
-  - Heuristic fallbacks when both providers are unavailable
-- **Externalized AI prompts** in Markdown files (`prompts/`), so you can edit them without touching Python.
-- **Secure authentication**:
-  - bcrypt password hashing (direct, no passlib)
-  - Signed JWT access tokens with configurable expiry, revocable via logout
-  - CSRF protection on all authenticated write forms
-  - HTTP-only secure cookies with configurable `SameSite`
-  - 8-character minimum password; standard error semantics (401 unauthenticated
-    with `WWW-Authenticate: Bearer`, 403 forbidden, 409 duplicate registration)
-  - Login rate limiting per IP + username (429 + `Retry-After`)
-- **Skills Gap Analysis**: compare resume skills to job requirements, get a gap score and learning path.
-- **Job management**: post, edit, and delete jobs (recruiters); browse and apply (job seekers).
-- **Localization**: 20 locales (10 Indian + 10 global), every UI string translated.
-- **Modern Python tooling**: `uv`, `ruff`, `ty`, `pytest`, GitHub Actions CI.
-- **Docker ready**: compose with named volumes, health check, and resource limits.
-
-## Tech Stack
-
-| Layer | Technology |
+| Landing | Dashboard (after login) |
 |---|---|
-| Runtime | Python 3.12 |
-| Web Framework | FastAPI + Jinja2 SSR |
-| ORM | SQLAlchemy 2.0 (async) |
-| Database | SQLite (default) / PostgreSQL (asyncpg) |
-| AI Primary | Google GenAI SDK (Gemini 2.5 Flash) |
-| AI Fallback | OpenAI SDK → OpenRouter |
-| Auth | bcrypt + PyJWT + itsdangerous CSRF |
-| Frontend | DaisyUI 3 + Tailwind CSS CDN + Alpine.js + Chart.js |
-| Testing | pytest + pytest-asyncio + httpx AsyncClient |
-| Linting | ruff (format + check) |
-| Type Checking | ty |
-| Package Manager | uv |
+| ![Landing page with hero, register and login actions](docs/screenshots/01-landing.png) | ![Dashboard with resume and application stats](docs/screenshots/04-dashboard.png) |
+| **Resume parse and quality score** | **Job market analysis (recruiter)** |
+| ![Resume detail with parsed skills and quality score](docs/screenshots/05-resume-detail.png) | ![Market analysis with skill demand charts](docs/screenshots/07-market-analysis.png) |
 
-## Features
+## Architecture
 
-### Job Seekers
+One FastAPI process, two surfaces, one service layer:
 
-- Upload resume (PDF, DOCX, TXT) or paste plain text
-- AI resume parsing: skills, experience, education, projects, certifications
-- Browse and apply to jobs with AI-computed match scores
-- AI resume improvement suggestions and quality scoring
-- **Skills Gap Analysis**: gap score, matched/missing skills, personalized learning path
-- Application tracking with status updates
+```mermaid
+flowchart LR
+    B["Browser"] --> M["main.py<br/>FastAPI app"]
+    A["API client"] --> M
+    M -->|" /api/v1/*<br/>Bearer JWT "| API["api.py<br/>REST routes"]
+    M -->|" /*<br/>cookie + CSRF "| UI["ui.py<br/>Jinja2 SSR"]
+    API --> SVC["services.py<br/>domain + AI"]
+    UI --> SVC
+    SVC --> AI["AIService<br/>GenAI → OpenRouter → heuristics"]
+    SVC --> ORM["models.py<br/>SQLAlchemy 2.0 async"]
+    ORM --> DB["db/database.py<br/>aiosqlite / asyncpg"]
+    M -->|" lifespan "| DDL["create_all (fresh DBs)"]
+    M -->|" schema changes "| AL["alembic upgrade head"]
+```
 
-### Recruiters
+Routes carry no SQL and no AI calls. `services.py` holds the domain logic
+and the provider chain; `models.py` holds four ORM tables (users, resumes,
+jobs, applications); schema changes go through Alembic migrations, with
+`create_all` kept as a fresh-database convenience (docs/adr/0001).
 
-- Post, edit, and delete job listings
-- Review applications with AI match details and structured feedback
-- Update application status (new → reviewed → shortlisted → rejected)
-- Market analysis: skill demand charts, top skills, job counts
+Auth is bcrypt password hashing, PyJWT access tokens with `jti` revocation
+(logout works on both API and UI), httponly cookies plus timed CSRF tokens
+on the UI, and Bearer auth on the API. Login is rate-limited per client IP
++ submitted username (429 + `Retry-After`).
 
-## Quick Start
+The UI is server-rendered semantic HTML: keyboard-navigable throughout, a
+skip-to-content link, visible focus, decorative SVGs hidden from assistive
+tech, chart canvases with localized labels and adjacent data tables, and
+every string through the i18n pipeline (20 locales: 10 Indian, 10 global).
 
-### 1. Install dependencies
+## Quick start
+
+Requires Python 3.12 and [uv](https://docs.astral.sh/uv/). Nothing below
+needs API keys, network access to AI providers, or an account.
 
 ```bash
-uv sync
+uv sync --all-groups
+uv run alembic upgrade head        # optional; create_all covers fresh DBs
+uv run uvicorn main:app --port 8000
 ```
 
-### 2. Configure environment
+Then open <http://localhost:8000>, register an account, and create a resume
+(paste text or upload PDF/DOCX/TXT). The OpenAPI docs live at
+<http://localhost:8000/api/v1/docs>.
 
-Copy `.env.example` to `.env` and fill in your values:
+Configuration is optional; copy `.env.example` to `.env` to set
+`SECRET_KEY`, `GOOGLE_API_KEY`/`OPENROUTER_API_KEY`, `DATABASE_URL`
+(PostgreSQL via `postgresql+asyncpg://...`), cookie flags, or the login
+rate-limit window. With no keys, parsing and scoring come from the
+heuristics: directionally correct, coarser than the LLM paths, and the
+limitation is stated in docs/EVALUATION.md rather than hidden.
 
-```bash
-cp .env.example .env
-```
+## Verify
 
-Key variables:
-
-```env
-SECRET_KEY=replace-with-long-random-secret
-GOOGLE_API_KEY=your_google_genai_key
-OPENROUTER_API_KEY=your_openrouter_key
-DATABASE_URL=sqlite+aiosqlite:///./job_matcher.db
-COOKIE_SECURE=false
-```
-
-### 3. Run the app
-
-```bash
-uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-- **UI:** <http://localhost:8000>
-- **API docs:** <http://localhost:8000/api/v1/docs>
-
-## API Overview
-
-All API endpoints are prefixed with `/api/v1/`.
-
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/auth/register` | Register user |
-| POST | `/auth/login` | Login, returns JWT (rate-limited per IP + username; 429 + `Retry-After` when exceeded) |
-| GET | `/auth/me` | Current user info |
-| POST | `/auth/logout` | Revoke the presented JWT for the rest of its lifetime |
-| POST | `/resumes/` | Create resume from text |
-| GET | `/resumes/` | List resumes |
-| GET | `/resumes/{id}` | Get resume |
-| DELETE | `/resumes/{id}` | Delete resume |
-| POST | `/resumes/upload` | Upload resume file (multipart) |
-| POST | `/resumes/upload-base64` | Upload base64-encoded resume |
-| POST | `/resumes/{id}/improve` | AI improvement suggestions |
-| GET | `/resumes/{id}/quality-score` | AI quality score |
-| POST | `/jobs/` | Create job posting |
-| GET | `/jobs/` | List jobs |
-| GET | `/jobs/{id}` | Get job |
-| PUT | `/jobs/{id}` | Update job |
-| DELETE | `/jobs/{id}` | Delete job |
-| POST | `/match` | Match resume to job |
-| POST | `/applications/` | Apply to job |
-| GET | `/applications/` | List applications |
-| GET | `/applications/{id}` | Get application detail |
-| PATCH | `/applications/{id}/status` | Update application status |
-| GET | `/recommendations` | Personalized job recommendations |
-| GET | `/market-analysis` | Market skill demand analysis |
-| POST | `/skills-gap` | Skills gap analysis |
-
-## Quality Gates
+These are the repo's quality gates; every one was run green on the current
+revision (numbers in docs/STATUS.md and docs/EVALUATION.md).
 
 ```bash
 uv run ruff format --check .   # formatting
 uv run ruff check .            # linting
-uv run ty check .              # type checking (blocking in CI)
-uv run pytest tests/ -v        # 206 tests
+uv run ty check                # type checking
+uv run pytest tests/           # full suite, zero warnings
+uv run deptry .                # dependency/dead-import hygiene
+uv run alembic upgrade head    # migration chain against a fresh database
 ```
 
-CI enforces a coverage gate of ≥95% on the fully-measurable core modules
-(`core/`, `db/`, `models.py`, `schemas.py`, currently at 100%). See
-`docs/EVALUATION.md` for why `api.py`/`services.py`/`ui.py` are reported but
-not gated (coverage.py undercounts code resumed after async DB awaits).
+CI (GitHub Actions) runs the same gates plus a coverage floor of 95% on
+`core/`, `db/`, `models.py`, and `schemas.py` (currently 469/469 statements,
+100%). Actions are disabled on the repository per the owner's zero-spend
+policy; the workflow is kept runnable and was validated by executing every
+job's commands locally. Why reported coverage for `api.py`/`services.py`/
+`ui.py` is a lower bound: docs/EVALUATION.md (coverage.py misses code
+resumed after aiosqlite awaits).
+
+## API overview
+
+All endpoints live under `/api/v1` (Bearer auth; full contracts in
+`/api/v1/docs`):
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/auth/register` | Register (email, password ≥ 8 chars) |
+| POST | `/auth/login` | OAuth2 form login; rate-limited, 429 + `Retry-After` |
+| GET | `/auth/me` | Current user |
+| POST | `/auth/logout` | Revoke the presented token for its remaining life |
+| POST | `/resumes` | Create resume: multipart `file` upload or `resume_data` text |
+| GET | `/resumes/{id}/improve` | AI/heuristic improvement suggestions |
+| GET | `/resumes/{id}/quality-score` | Section-wise quality score |
+| POST | `/resumes/upload-base64` | Create resume from base64-encoded file |
+| GET | `/recommendations/{resume_id}` | Scored job recommendations |
+| POST | `/jobs` | Post job (recruiter) |
+| GET/PUT/DELETE | `/jobs/{id}` | Manage job (recruiter) |
+| POST | `/match` | Score a resume against a job |
+| POST | `/applications` | Apply to a job |
+| PATCH | `/applications/{id}/status?status_value=` | Update status: New/Reviewed/Shortlisted/Rejected |
+| GET | `/market-analysis` | Skill demand aggregation |
+| POST | `/skills-gap` | Gap score, missing skills, learning path |
+
+## Project structure
+
+```text
+├── main.py              App bootstrap & lifespan
+├── api.py               REST routes (/api/v1/*)
+├── ui.py                Server-rendered UI routes
+├── services.py          AI + domain service layer
+├── models.py            SQLAlchemy ORM models
+├── schemas.py           Pydantic request/response schemas
+├── core/                config, security, ratelimit, revocation, i18n
+├── db/                  async engine & session factory
+├── migrations/          Alembic (env wired to settings + Base.metadata)
+├── prompts/             AI prompt templates (.md, {placeholder} slots)
+├── templates/           Jinja2 SSR templates
+├── static/              Static assets
+├── tests/               pytest suite (API, UI, services, security, i18n, …)
+├── docs/                design.md, BUILD_LOG, AUDIT, EVALUATION, STATUS, ADRs
+├── Dockerfile           python:3.12-slim, non-root, healthcheck
+└── docker-compose.yml   named volumes + resource limits
+```
 
 ## Docker
 
@@ -150,67 +150,41 @@ not gated (coverage.py undercounts code resumed after async DB awaits).
 docker compose up --build
 ```
 
-The compose file includes a health check, named volumes for uploads and the database, and resource limits (512 MB RAM, 1 CPU).
+Non-root container, health check on `/`, named volumes for uploads and the
+database, 512 MB / 1 CPU limits.
 
-## Project Structure
+## Honest limits
 
-```text
-├── main.py              App bootstrap & lifespan
-├── api.py               REST API routes (/api/v1/*)
-├── ui.py                Server-rendered UI routes
-├── services.py          AI + domain service layer
-├── models.py            SQLAlchemy ORM models
-├── schemas.py           Pydantic request/response schemas
-├── core/
-│   ├── config.py        Settings & environment config
-│   ├── security.py      bcrypt / JWT / CSRF helpers
-│   ├── ratelimit.py     Login rate limiter (sliding window, injectable clock)
-│   ├── revocation.py    JWT jti denylist with expiry parity
-│   └── i18n.py          Locale normalization + 20-locale translations
-├── db/
-│   └── database.py      Async engine & session factory
-├── prompts/             Externalized AI prompt templates (.md)
-├── templates/           Jinja2 SSR templates
-├── static/              Static assets
-├── tests/               206 tests (services, security, i18n, config, database, ratelimit, revocation, API, UI)
-├── docs/                Audit, PRD, architecture, evaluation, style guides
-├── .env.example         Example environment configuration
-├── .github/workflows/   CI/CD pipeline (quality + test + docker)
-├── Dockerfile           Container build (python:3.12-slim, non-root user)
-└── docker-compose.yml   Compose orchestration with health check
-```
+- Coverage percentages for `api.py`/`services.py`/`ui.py` are deterministic
+  lower bounds: coverage.py misses code resumed after aiosqlite awaits
+  (docs/EVALUATION.md). Those paths are tested behaviorally; the gated
+  modules measure 100%.
+- Heuristic parsing matches a fixed 26-skill vocabulary; resumes outside it
+  parse coarsely without AI keys.
+- Rate limiting and token revocation state are in-memory: per worker under
+  multi-worker deployments, reset on restart. A shared store (Redis) is the
+  recorded upgrade path.
+- Recommendation scoring is sequential over up to 100 jobs; with real keys
+  that is the dominant latency path (batching needs a product call,
+  AUDIT A-13).
 
-## Localization
+## Docs
 
-Locale is switched from the sidebar language selector (persisted in a cookie).
-
-| Group | Locales |
+| Document | Contents |
 |---|---|
-| Indian / Regional | `en`, `hi`, `bn`, `te`, `mr`, `ta`, `ur`, `gu`, `kn`, `ml` |
-| Global | `es`, `fr`, `ar`, `zh`, `pt`, `de`, `ru`, `ja`, `ko`, `it` |
+| docs/design.md | HLD + LLD, data flows, auth design, decision index |
+| docs/BUILD_LOG.md | Engineering history: what was tried, rejected, kept |
+| docs/AUDIT.md | Line-by-line audit findings and dispositions (A-01..A-29) |
+| docs/EVALUATION.md | Measured gates, coverage matrix, limitations |
+| docs/STATUS.md | Current state with real numbers from the last run |
+| docs/adr/ | Architecture decision records |
+| docs/style-guides/ | Python, FastAPI, and testing conventions |
 
-All UI strings, including Skills Gap Analysis and Job Edit/Delete, are translated across all 20 locales. English is the base; other locales inherit any untranslated keys automatically.
+## Contributing
 
-## Environment Variables
+See CONTRIBUTING.md. Accessibility and the no-suppression rule are the two
+lines that do not move.
 
-See `.env.example` for the full list. Key variables:
+## License
 
-| Variable | Default | Description |
-|---|---|---|
-| `SECRET_KEY` | (random) | JWT signing key; **set in production** |
-| `GOOGLE_API_KEY` | — | Google GenAI API key |
-| `OPENROUTER_API_KEY` | — | OpenRouter API key (fallback) |
-| `DATABASE_URL` | SQLite | Async SQLAlchemy URL |
-| `COOKIE_SECURE` | `false` | Set `true` in production (HTTPS) |
-| `LOGIN_RATE_LIMIT_ATTEMPTS` | `5` | Failed-login burst allowance per IP + username |
-| `LOGIN_RATE_LIMIT_WINDOW_SECONDS` | `300` | Sliding window for the login limiter (in-memory: per worker, reset on restart) |
-| `CORS_ORIGINS` | localhost | Comma-separated allowed origins |
-| `DEFAULT_LOCALE` | `en` | Default UI locale |
-| `GOOGLE_THINKING_BUDGET` | `8192` | Gemini thinking token budget |
-
-## Notes
-
-- When AI provider keys are unavailable, heuristic fallbacks keep all core flows operational.
-- SQLite is the default for fast local setup; switch to PostgreSQL via `DATABASE_URL=postgresql+asyncpg://...`.
-- AI prompts live in `prompts/*.md`; edit them without touching Python code.
-- All form writes are CSRF-protected; the API uses Bearer token auth separately.
+MIT.

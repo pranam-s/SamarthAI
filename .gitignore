@@ -182,6 +182,7 @@ tmp_dep_audit.ps1
 *.sqlite
 *.sqlite3
 uploads/*
+uploads_demo/*
 !uploads/.gitkeep
 .env
 .env.*

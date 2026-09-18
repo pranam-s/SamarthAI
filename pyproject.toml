@@ -1,6 +1,6 @@
 [project]
 name = "samarth-ai"
-version = "0.6.0"
+version = "0.7.0"
 description = "AI-driven resume and job matching platform"
 readme = "README.md"
 authors = [{ name = "pranam-s" }]
