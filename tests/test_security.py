@@ -23,6 +23,11 @@ from core.security import (
 # JWT access tokens
 # ---------------------------------------------------------------------------
 
+# Deliberately different from the runtime key, and long enough to meet the
+# RFC 7518 HS256 minimum so decoding with it does not raise
+# InsecureKeyLengthWarning (the warning would drown the real assertion).
+WRONG_SECRET_KEY = "a-completely-different-key-that-is-long-enough-for-hs256"
+
 
 class TestAccessToken:
     def test_roundtrip(self) -> None:
@@ -102,7 +107,7 @@ class TestCSRFToken:
 class TestDecodeErrors:
     def test_wrong_key_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         token = create_access_token(subject=1)
-        monkeypatch.setattr(settings, "SECRET_KEY", "a-completely-different-key")
+        monkeypatch.setattr(settings, "SECRET_KEY", WRONG_SECRET_KEY)
         with pytest.raises(jwt.InvalidSignatureError):
             decode_access_token(token)
 
@@ -133,5 +138,5 @@ class TestDecodeTokenSubject:
 
     def test_wrong_key_returns_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
         token = create_access_token(subject=1)
-        monkeypatch.setattr(settings, "SECRET_KEY", "a-completely-different-key")
+        monkeypatch.setattr(settings, "SECRET_KEY", WRONG_SECRET_KEY)
         assert decode_token_subject(token) is None
