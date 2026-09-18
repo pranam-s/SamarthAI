@@ -70,7 +70,7 @@ auth/CSRF flows, upload hardening, login rate limiting, logout revocation).
 ## Performance characteristics (observed, not benchmarked)
 
 - Heuristic fallback paths are pure in-process computation; full test suite
-  (206 tests) runs in ~31 s on 6 cores (measured 2026-09-16).
+  (206 tests) ran in ~31 s on the previous development machine (measured 2026-09-16); ~101 s on the current machine (2026-09-18, see STATUS).
 - AI-enabled paths add one round-trip per LLM call (parse, score, feedback are
   sequential by design); recommendations score up to 100 jobs sequentially,
   which is the dominant latency risk with real keys (A-13).
